@@ -1,0 +1,309 @@
+source("init.R")
+
+library(shiny)
+library(shinythemes)
+
+button_style <- "color: black; background-color: rgb(230, 220, 205); position: relative; 
+                     text-align:center;border-radius: 6px; border-width: 2px"
+
+ui <- fluidPage(
+  theme = shinytheme("cosmo"),
+                
+  # -- Meta data
+  tags$head(
+    tags$meta(name="description", content="Puerto Rico COVID-19 Vaccine Dashboard"),
+    tags$meta(name="keywords", content="Puerto Rico, Dashboard, COVID-19"),
+    tags$meta(name="author", content="Mónica Robles-Fontán, José Zavala, Rafael A. Irizarry")
+  ),
+  
+  #-- Google analytics add on
+  tags$head(includeHTML(("google-analytics.html"))),
+  
+  # Application title
+  titlePanel("Informe de vacunas COVID-19 en Puerto Rico (en construcción)"),
+  
+  tabsetPanel(id = "tabs", 
+              tabPanel("Resumen",
+                       htmlOutput("fecha"),
+                       htmlOutput("summary_1"),
+                       hr(),
+                       htmlOutput("summary_2")
+              ),
+              tabPanel("Eventos",
+                       sidebarLayout(
+                         sidebarPanel(
+                           selectInput("event_type",
+                                       "",
+                                       choice = c(Muertes = "death",
+                                                  Hospitalizaciones = "hosp",
+                                                  Casos = "cases"),
+                                       selected = "death"),
+                           dateRangeInput("event_range", "Periodo", 
+                                          start = last_day - days(240),
+                                          end = last_day,
+                                          format = "M-dd-yyyy",
+                                          language = "es",
+                                          width = "100%",
+                                          min = first_day,
+                                          max = last_day),
+                           selectInput("event_agerange",
+                                       "Grupo de Edad",
+                                       choice = c("Agregados" = "all",
+                                                  "Todos" = "facet",
+                                                  rev(age_levels[-c(1,2)])),
+                                       selected = "all"),
+                           width = 3),
+                         mainPanel(
+                            plotOutput("muertes_plot"),
+                            DT::dataTableOutput("muertes_tabla"))
+                         )),
+              
+              tabPanel("Pirámide",
+                       plotOutput("piramide"),
+                       htmlOutput("piramide_tabla")),
+              
+              tabPanel("Datos Diarios", 
+                       sidebarLayout(
+                         sidebarPanel(
+                           dateRangeInput("tabla_range", "Periodo", 
+                                          start = last_day - days(60),
+                                          end = last_day,
+                                          format = "M-dd-yyyy",
+                                          language = "es",
+                                          width = "100%",
+                                          min = first_day,
+                                          max = last_day),
+                           width = 3),
+                         mainPanel(
+                           DT::dataTableOutput("tabla")
+                         )
+                       )
+              )
+  ),
+  htmlOutput("update"),
+)
+              
+
+
+
+
+server <- function(input, output, session) {
+    
+  output$fecha <- renderText({
+    paste0("<h4>Datos para ", 
+           format(last_day, "%B %d, %Y:"), "</h4>")})
+  
+  output$update <- renderText({
+    paste0("<h4>Última actualización: ", format(the_stamp, "%B %d, %Y"), "</h4>")
+  })
+  
+  output$summary_1 <- renderText({
+    load(file.path(rda_path, "tabs.rda"))
+    summary_tab %>% 
+      mutate(total = make_pretty(total),
+             porciento = make_pct(porciento),
+             tasas = make_pretty(round(tasas))) %>%
+      select(names, total, tasas, porciento) %>%
+      kableExtra::kbl(col.names = c("", "Total", "Por semana", "Por ciento de la población"),
+                    align = c("l","r","r","r")) %>%
+    kableExtra::kable_styling()
+  
+  })
+  
+  output$summary_2 <- renderText({
+    load(file.path(rda_path, "tabs.rda"))
+  
+    outcome_tab %>% 
+      mutate(status = recode(status, UNV = "No vacunados", PAR= "Parcial", VAX="Vacunados")) %>%
+      mutate(manu = recode(as.character(manu), UNV = "", MOD = "Moderna", 
+                           PFR = "Pfizer", JSN = "J & J")) %>%
+      mutate(n = make_pretty(round(n)),
+             cases = make_pretty(cases), 
+             rate_cases =  digits(rate_cases * 10^5/365, 1),
+             hosp = make_pretty(hosp), 
+             rate_hosp =  digits(rate_hosp * 10^5/365, 1),
+             death = make_pretty(death), 
+             rate_death =  digits(rate_death * 10^5/365, 2), 
+             total = make_pretty(round(total))) %>%
+      select(status, manu, total, n, cases, rate_cases, hosp,rate_hosp, death, rate_death) %>%
+      kableExtra::kbl(col.names = c("Vacunación", "Tipo de vacuna", "Total", "Años-Persona", "Casos", "Casos por 100,000 por día", "Hosp", "Hosp por 100,000 por día", "Muertes","Muertes por 100,000 por día"),
+                      align = c("c","c", rep("r", 8)))  %>%
+      kableExtra::kable_styling() %>%
+      kableExtra::column_spec(1, width = "12em")
+  })
+  
+   output$muertes_plot <- renderPlot({
+     load(file.path(rda_path, "counts.rda"))
+     
+     the_title <- case_when(
+       input$event_type == "death" ~ "Tasa de mortalidad por estado de vacunación",
+       input$event_type == "hosp" ~ "Tasa de hospitalización por estado de vacunación",
+       input$event_type == "cases" ~ "Casos por 100,000 por día por estado de vacunación")
+     
+     if(input$event_agerange %in% c("all", "facet")){
+       counts <- filter(counts, ageRange != "0-4" & ageRange !="5-11") %>%
+         mutate(ageRange = droplevels(ageRange))} else{
+           counts <- filter(counts, ageRange == input$event_agerange)
+     }
+     
+     if(input$event_agerange == "all") counts$ageRange <- "all" 
+     
+     p <- counts %>% 
+       filter(date >= input$event_range[1] & date <= input$event_range[2]) %>%
+       filter(status %in% c("VAX", "UNV")) %>%
+       mutate(outcome = !!sym(input$event_type)) %>%
+       group_by(date, manu, ageRange) %>%
+       summarize(outcome = sum(outcome), n=sum(n, na.rm=TRUE), .groups = "drop") %>%
+       group_by(manu, ageRange) %>% 
+       mutate(denom =  ma7(date, n, k = 14)$moving_avg) %>%
+       mutate(rate = ma7(date, outcome, k = 14)$moving_avg/denom * 10^5) %>%
+       ungroup() %>%
+       filter(denom > 25) %>%
+       ggplot(aes(date, rate, color = manu)) +
+       geom_line(lwd = 1.5, alpha = 0.7) +
+       labs(y="Tasa por día por 100,000", x="Fecha", title = the_title, 
+            caption = "Basado en media móvil de 14 días")+
+       scale_color_manual(
+         labels = c(manu_labels[["UNV"]], manu_labels[["MOD"]], manu_labels[["PFR"]],
+                    manu_labels[["JSN"]]),
+         values = c(manu_colors[["UNV"]], manu_colors[["MOD"]], manu_colors[["PFR"]],
+                    manu_colors[["JSN"]]), name="Vacuna:") +
+       theme_bw()+
+       theme(legend.position = "bottom", text = element_text(size = 15))
+     
+     if(input$event_agerange == "facet") p <- p + facet_wrap(~ageRange)
+     
+     return(p)
+
+  })
+  
+  output$muertes_tabla <- DT::renderDataTable({
+    load(file.path(rda_path, "dat_cases.rda"))
+    
+    date_name <-  paste0("date_", input$event_type)
+    
+    if(!input$event_agerange %in% c("all", "facet")){
+      dat_cases <- filter(dat_cases, ageRange == input$event_agerange)
+    } 
+    
+    dat_cases$cases <- TRUE
+    dat_cases$date_cases <- dat_cases$date
+    ret <- dat_cases %>% 
+      filter(!!sym(input$event_type)) %>%
+      mutate(date = !!sym(date_name)) %>%
+      filter(date >= input$event_range[1] & date <= input$event_range[2]) %>%
+      slice(1:1000) %>%
+      mutate(days = pmax(0, ifelse(manu=="JSN", as.numeric(date-date_1), as.numeric(date - date_2)))) %>%
+      mutate(days = na_if(days, 0)) %>%
+      mutate(booster = case_when(booster ~ "Sí",
+                                 status == "VAX" ~ "No",
+                                 TRUE ~ "")) %>%
+      select(date, ageRange, gender, status, manu, days, booster) %>%
+      mutate(status = as.character(recode(status, UNV = "No vacunado", PAR= "Parcial", VAX="Vacunado"))) %>%
+      mutate(status = ifelse(gender == "F" & status == "Vacunado", "Vacunada", status)) %>%
+      mutate(status = ifelse(gender == "F" & status == "No vacunado", "No vacunada", status)) %>%
+      mutate(manu = recode(as.character(manu), UNV = "", MOD = "Moderna", PFR = "Pfizer", JSN = "J & J"))
+     
+
+
+    make_datatable(ret, 
+                   col.names = c("Fecha", "Grupo de edada", "Sexo", "Vacunación", 
+                                 "Tipo de vacuna", "Días desde completar dosis", 
+                                 "Booster"),
+                   align = c("r", "c", "c", "c", "c", "r", "r"),
+                   nowrap = 1:3)
+    },
+  server = FALSE)
+  
+  output$piramide <- renderPlot({
+    load(file.path(rda_path, "poblacion.rda"))
+    tab <- poblacion %>% 
+      filter(date == max(date) & gender %in% c("M","F")) %>%
+      group_by(ageRange,gender,status) %>%
+      summarize(n = sum(n), .groups = "drop") %>%
+      mutate(n = ifelse(gender=="M", -n, n)) %>%
+      arrange(gender, ageRange) %>%
+      mutate(status = recode(status, UNV = "No vacunados", PAR = "Parcial", VAX = "Vacunados")) %>%
+      rename(estatus = status)
+
+    labs <- seq(-200000, 200000, 100000)
+    tab %>%
+      ggplot(aes(ageRange, n, fill = estatus)) +
+      geom_bar(position = "stack", stat = "identity", color = I("black"), width = 1) +
+      scale_y_continuous(labels= prettyNum(abs(labs), big.mark = ",", scientific=FALSE), breaks = labs,
+                         limits = c(-275000, 275000)) + 
+      ylab("Personas") +
+      xlab("Grupo de edad") + 
+      annotate("text", x=Inf, y=Inf, label = "\nMujeres   ", vjust = 1, hjust = 1) +
+      annotate("text", x=Inf, y=-Inf, label = "\n   Hombres", vjust = 1, hjust = 0) +
+      coord_flip() + 
+      theme_bw() +
+      scale_fill_discrete(name = "Estado de vacunación") +
+      theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), 
+            text = element_text(size = 15)) +
+      ggtitle("Pirámide poblacional")
+  })
+  
+  output$piramide_tabla <- renderText({
+    
+    load(file.path(rda_path, "daily_vax_counts.rda"))
+    load(file.path(rda_path, "population-tabs.rda"))
+  
+    make_col <- function(x,n) paste0(make_pretty(x), " (", make_pct(x/n,0), ")")
+    daily_vax_counts %>% 
+      filter(gender %in% c("M", "F")) %>%
+      group_by(ageRange, gender) %>%
+      summarize(onedose = sum(onedose), full = sum(full),
+                booster=sum(booster), lost = sum(lost), .groups = "drop") %>%
+      mutate(immune = full - lost) %>%
+      left_join(pop_by_age_gender, by = c("ageRange", "gender")) %>%
+      mutate(onedose = make_col(onedose, poblacion),
+             full = make_col(full, poblacion),
+             immune = make_col(immune, poblacion),
+             booster = make_col(booster, poblacion),
+             poblacion = make_pretty(round(poblacion))) %>%
+      select(ageRange, gender, poblacion, onedose, full, immune, booster) %>%
+      kbl(col.names = c("Grupo de Edad", "Sexo", "Población", "Una dosis", "Dosis completa", "Dosis complete sin necesidad de Booster", "Con booster"),
+                      align = c("c","c", rep("r", 9)))  %>%
+      kable_styling()
+  })
+  
+  output$tabla <- DT::renderDataTable({
+    load(file.path(rda_path, "counts.rda"))
+    
+    ret <- counts %>% filter(date >= input$tabla_range[1] & date <= input$tabla_range[2]) %>%
+      group_by(date, manu, status) %>%
+      summarize(cases = sum(cases), hosp = sum(hosp), 
+                death = sum(death), n=sum(n, na.rm=TRUE), .groups = "drop") %>%
+      group_by(manu, status) %>%
+      mutate(cases_rate = ma7(date, cases)$moving_avg/ma7(date, n)$moving_avg * 10^5,
+             hosp_rate = ma7(date, hosp)$moving_avg/ma7(date, n)$moving_avg * 10^5,
+             death_rate = ma7(date, death)$moving_avg/ma7(date, n)$moving_avg * 10^5) %>%
+      ungroup() %>%
+      arrange(desc(date), status, manu) %>%
+      mutate(status = recode(status, UNV = "No vacunados", PAR= "Parcial", VAX="Vacunados")) %>%
+      mutate(manu = recode(as.character(manu), UNV = "", MOD = "Moderna", PFR = "Pfizer", JSN = "J & J")) %>%
+      mutate(n = make_pretty(round(n)),
+             cases_rate = digits(cases_rate),
+             hosp_rate =digits(hosp_rate),
+             death_rate = digits(death_rate)) %>%
+      select(date, status, manu, n, cases_rate, hosp_rate, death_rate, cases, hosp, death)
+    
+    make_datatable(ret, align = c("r","c","c", rep("r",7)), nowrap = 1:3,
+                   col.names = c("Fecha", "Vacunación", "Tipo de vacuna", "Población",
+                                 "Casos (tasa) ", "Hosp (tasa)", "Muertes (tasa)",
+                                 "Casos", "Hosp", "Muertes"))
+  },
+  server = FALSE
+)
+  
+  
+}
+
+shinyApp(ui = ui, server = server)
+
+                                       
+                                
+
+
+                
