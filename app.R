@@ -50,7 +50,7 @@ ui <- fluidPage(
                                        "Grupo de Edad",
                                        choice = c("Agregados" = "all",
                                                   "Todos" = "facet",
-                                                  rev(age_levels[-c(1,2)])),
+                                                  rev(age_levels[-1])),
                                        selected = "all"),
                            width = 3),
                          mainPanel(
@@ -59,9 +59,33 @@ ui <- fluidPage(
                          )),
               
               tabPanel("Pirámide",
-                       plotOutput("piramide"),
-                       htmlOutput("piramide_tabla")),
-              
+                       sidebarLayout(
+                         sidebarPanel(
+                           selectInput("piramide_municipio",
+                                       "Municipio",
+                                       choice = c(Todos = "all",
+                                                  municipios),
+                                       selected = "all"),
+                           width = 3),
+                         mainPanel(
+                           plotOutput("piramide"),
+                           htmlOutput("piramide_tabla")
+                         )
+                       )),
+              tabPanel("Municipios",
+                       sidebarLayout(
+                         sidebarPanel(
+                           selectInput("municipio_agerange",
+                                       "Grupo de Edad",
+                                       choice = c("Agregados" = "all",
+                                                  rev(age_levels[-1])),
+                                       selected = "all"),
+                           width = 3),
+                         mainPanel(
+                           plotOutput("mapa"),
+                           DT::dataTableOutput("municipio_tabla")
+                         )
+                       )),
               tabPanel("Datos Diarios", 
                        sidebarLayout(
                          sidebarPanel(
@@ -216,23 +240,31 @@ server <- function(input, output, session) {
   server = FALSE)
   
   output$piramide <- renderPlot({
+    
     load(file.path(rda_path, "poblacion.rda"))
+      
+    if(input$piramide_municipio != "all"){
+      poblacion <- poblacion_muni %>% filter(municipio == input$piramide_municipio)
+    }
+     
     tab <- poblacion %>% 
       filter(date == max(date) & gender %in% c("M","F")) %>%
-      group_by(ageRange,gender,status) %>%
+      group_by(ageRange, gender, status) %>%
       summarize(n = sum(n), .groups = "drop") %>%
       mutate(n = ifelse(gender=="M", -n, n)) %>%
       arrange(gender, ageRange) %>%
-      mutate(status = recode(status, UNV = "No vacunados", PAR = "Parcial", VAX = "Vacunados")) %>%
+      mutate(n = n/sum(abs(n))) %>%
+      mutate(etatus = recode(status, UNV = "No vacunados", PAR = "Parcial", VAX = "Vacunados")) %>%
       rename(estatus = status)
 
-    labs <- seq(-200000, 200000, 100000)
+    labs <- seq(-.08, .08, 0.04)
+    
+    mun <- recode(input$piramide_municipio, all = "Puerto Rico")
     tab %>%
       ggplot(aes(ageRange, n, fill = estatus)) +
       geom_bar(position = "stack", stat = "identity", color = I("black"), width = 1) +
-      scale_y_continuous(labels= prettyNum(abs(labs), big.mark = ",", scientific=FALSE), breaks = labs,
-                         limits = c(-275000, 275000)) + 
-      ylab("Personas") +
+      scale_y_continuous(labels= make_pct(abs(labs)), breaks = labs) + 
+      ylab("Porciento de la poblacion") +
       xlab("Grupo de edad") + 
       annotate("text", x=Inf, y=Inf, label = "\nMujeres   ", vjust = 1, hjust = 1) +
       annotate("text", x=Inf, y=-Inf, label = "\n   Hombres", vjust = 1, hjust = 0) +
@@ -241,13 +273,20 @@ server <- function(input, output, session) {
       scale_fill_discrete(name = "Estado de vacunación") +
       theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), 
             text = element_text(size = 15)) +
-      ggtitle("Pirámide poblacional")
+      ggtitle(paste("Pirámide poblacional de", mun))
   })
   
   output$piramide_tabla <- renderText({
     
-    load(file.path(rda_path, "daily_vax_counts.rda"))
     load(file.path(rda_path, "population-tabs.rda"))
+    if(input$piramide_municipio == "all"){ 
+      load(file.path(rda_path, "daily_vax_counts.rda"))
+    } else{
+      load(file.path(rda_path, "daily_vax_counts_by_municipio.rda"))
+      daily_vax_counts <- daily_vax_counts_by_municipio  %>% filter(municipio == input$piramide_municipio)
+      poblacion <- poblacion_muni %>% filter(municipio == input$piramide_municipio)
+      pop_by_age_gender <- pop_by_age_gender_municipio %>% filter(municipio == input$piramide_municipio)
+    }
   
     make_col <- function(x,n) paste0(make_pretty(x), " (", make_pct(x/n,0), ")")
     daily_vax_counts %>% 
@@ -267,6 +306,117 @@ server <- function(input, output, session) {
                       align = c("c","c", rep("r", 9)))  %>%
       kable_styling()
   })
+  
+  output$mapa <- renderPlot({
+    load(file.path(rda_path, "daily_vax_counts_by_municipio.rda"))
+    load(file.path(rda_path, "population-tabs.rda"))
+    load(file.path(rda_path, "map.rda"))
+    
+    if(input$municipio_agerange=="all"){
+      tab <- daily_vax_counts_by_municipio %>% 
+        filter(gender %in% c("M", "F")) %>%
+        group_by(municipio) %>%
+        summarize(onedose = sum(onedose), full = sum(full),
+                  booster=sum(booster), lost = sum(lost), .groups = "drop") 
+      pop <- pop_by_age_gender_municipio %>% group_by(municipio) %>%
+        summarize(poblacion=sum(poblacion))
+      
+    }  else{
+      tab <- daily_vax_counts_by_municipio %>% 
+        filter(gender %in% c("M", "F") &
+                 ageRange == input$municipio_agerange) %>%
+        group_by(municipio) %>%
+        summarize(onedose = sum(onedose), full = sum(full),
+                  booster=sum(booster), lost = sum(lost), .groups = "drop") 
+      
+      pop <- pop_by_age_gender_municipio %>% 
+        filter(ageRange == input$municipio_agerange) %>%
+        group_by(municipio) %>%
+        summarize(poblacion=sum(poblacion), .groups = "drop") 
+    }
+    min_rate <- .40
+    max_rate <- .70
+    
+    tab  %>%
+      mutate(immune = full - lost) %>%
+      left_join(pop , by = c("municipio")) %>%
+      mutate(rate = full/ poblacion) %>%      
+      mutate(rate = 100*pmin(pmax(rate, min_rate), max_rate)) %>%
+      na.omit() %>%
+      left_join(map, by = "municipio") %>%
+      ggplot() + 
+      geom_polygon(aes(x = X, y = Y, group = paste(municipio, part), fill = rate), color = "black", size = 0.15) + 
+      geom_text(mapping = aes(x = X, y = Y, label = municipio), data = map_centers,
+                size  = 2.0,
+                color = "black") +
+      scale_fill_gradientn(colors = rev(RColorBrewer::brewer.pal(9, "Reds")),
+                           name = "Por ciento con dosis completa:",
+                           limits= c(100*min_rate, 100*max_rate)) +
+      coord_map() +
+      theme_void() +
+      theme(legend.position = "bottom")
+  })
+  
+  output$municipio_tabla <- DT::renderDataTable({
+    load(file.path(rda_path, "daily_vax_counts_by_municipio.rda"))
+    load(file.path(rda_path, "population-tabs.rda"))
+    
+    if(input$municipio_agerange=="all"){
+      tab <- daily_vax_counts_by_municipio %>% 
+        filter(gender %in% c("M", "F")) %>%
+        group_by(municipio) %>%
+        summarize(onedose = sum(onedose), full = sum(full),
+                  booster=sum(booster), lost = sum(lost), .groups = "drop") 
+      pop <- pop_by_age_gender_municipio %>% group_by(municipio) %>%
+        summarize(poblacion=sum(poblacion))
+      
+    }  else{
+      tab <- daily_vax_counts_by_municipio %>% 
+        filter(gender %in% c("M", "F") &
+                 ageRange == input$municipio_agerange) %>%
+        group_by(municipio) %>%
+        summarize(onedose = sum(onedose), full = sum(full),
+                  booster=sum(booster), lost = sum(lost), .groups = "drop") 
+      
+      pop <- pop_by_age_gender_municipio %>% 
+        filter(ageRange == input$municipio_agerange) %>%
+        group_by(municipio) %>%
+        summarize(poblacion=sum(poblacion), .groups = "drop") 
+    }
+    
+    make_col <- function(x,n) paste0(make_pretty(x), " (", make_pct(x/n,0), ")")
+    
+    tab  %>%
+      mutate(immune = full - lost) %>%
+      left_join(pop , by = c("municipio")) %>%
+      arrange(full/poblacion) %>% 
+      mutate(oonedose = onedose/poblacion,
+             onedose = make_col(onedose, poblacion),
+             ofull = full/poblacion,
+             full = make_col(full, poblacion),
+             oimmune = immune/poblacion,
+             immune = make_col(immune, poblacion),
+             obooster = booster/poblacion,
+             booster = make_col(booster, poblacion),
+             opoblacion = poblacion,
+             poblacion = make_pretty(round(poblacion))) %>%
+      select(municipio, poblacion, onedose, full, immune, booster,
+             opoblacion, oonedose, ofull, oimmune, obooster) %>%
+      setNames(c("Municipio", "Población", "Una dosis", "Dosis completa", "Dosis complete sin necesidad de Booster", "Con booster",
+                 "opoblacion", "oonedose", "ofull", "oimmune", "obooster"))%>%
+      DT::datatable(rownames = FALSE,
+                    options = list(dom = 't', pageLength = -1,
+                                   columnDefs = list(list(targets = 1, orderData = 6),
+                                                     list(targets = 2, orderData = 7),
+                                                     list(targets = 3, orderData = 8),
+                                                     list(targets = 4, orderData = 9),
+                                                     list(targets = 5, orderData = 10),
+                                                     list(targets = 6:10, visible = FALSE),
+                                                     list(className = 'dt-left', targets = 0),
+                                                     list(className = 'dt-right', targets = 1:5)))) %>%
+      DT::formatStyle(1, "white-space" = "nowrap")
+  }, 
+  server = FALSE)
   
   output$tabla <- DT::renderDataTable({
     load(file.path(rda_path, "counts.rda"))
