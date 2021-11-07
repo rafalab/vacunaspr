@@ -58,20 +58,6 @@ ui <- fluidPage(
                             DT::dataTableOutput("muertes_tabla"))
                          )),
               
-              tabPanel("Pirámide",
-                       sidebarLayout(
-                         sidebarPanel(
-                           selectInput("piramide_municipio",
-                                       "Municipio",
-                                       choice = c(Todos = "all",
-                                                  municipios),
-                                       selected = "all"),
-                           width = 3),
-                         mainPanel(
-                           plotOutput("piramide"),
-                           htmlOutput("piramide_tabla")
-                         )
-                       )),
               tabPanel("Municipios",
                        sidebarLayout(
                          sidebarPanel(
@@ -84,6 +70,21 @@ ui <- fluidPage(
                          mainPanel(
                            plotOutput("mapa"),
                            DT::dataTableOutput("municipio_tabla")
+                         )
+                       )),
+              
+              tabPanel("Pirámide",
+                       sidebarLayout(
+                         sidebarPanel(
+                           selectInput("piramide_municipio",
+                                       "Municipio",
+                                       choice = c(Todos = "Todos",
+                                                  municipios),
+                                       selected = "all"),
+                           width = 3),
+                         mainPanel(
+                           plotOutput("piramide"),
+                           htmlOutput("piramide_tabla")
                          )
                        )),
               tabPanel("Datos Diarios", 
@@ -241,23 +242,11 @@ server <- function(input, output, session) {
   
   output$piramide <- renderPlot({
     
-    load(file.path(rda_path, "poblacion.rda"))
+    load(file.path(rda_path, "piramide.rda"))
       
-    if(input$piramide_municipio != "all"){
-      poblacion <- poblacion_muni %>% filter(municipio == input$piramide_municipio)
-    }
-     
-    tab <- poblacion %>% 
-      filter(date == max(date) & gender %in% c("M","F")) %>%
-      group_by(ageRange, gender, status) %>%
-      summarize(n = sum(n), .groups = "drop") %>%
-      mutate(n = ifelse(gender=="M", -n, n)) %>%
-      arrange(gender, ageRange) %>%
-      mutate(n = n/sum(abs(n))) %>%
-      mutate(etatus = recode(status, UNV = "No vacunados", PAR = "Parcial", VAX = "Vacunados")) %>%
-      rename(estatus = status)
-
     labs <- seq(-.08, .08, 0.04)
+    
+    tab <- filter(piramide, municipio == input$piramide_municipio)
     
     mun <- recode(input$piramide_municipio, all = "Puerto Rico")
     tab %>%
@@ -278,24 +267,11 @@ server <- function(input, output, session) {
   
   output$piramide_tabla <- renderText({
     
-    load(file.path(rda_path, "population-tabs.rda"))
-    if(input$piramide_municipio == "all"){ 
-      load(file.path(rda_path, "daily_vax_counts.rda"))
-    } else{
-      load(file.path(rda_path, "daily_vax_counts_by_municipio.rda"))
-      daily_vax_counts <- daily_vax_counts_by_municipio  %>% filter(municipio == input$piramide_municipio)
-      poblacion <- poblacion_muni %>% filter(municipio == input$piramide_municipio)
-      pop_by_age_gender <- pop_by_age_gender_municipio %>% filter(municipio == input$piramide_municipio)
-    }
-  
+    load(file.path(rda_path, "piramide.rda"))
+    
     make_col <- function(x,n) paste0(make_pretty(x), " (", make_pct(x/n,0), ")")
-    daily_vax_counts %>% 
-      filter(gender %in% c("M", "F")) %>%
-      group_by(ageRange, gender) %>%
-      summarize(onedose = sum(onedose), full = sum(full),
-                booster=sum(booster), lost = sum(lost), .groups = "drop") %>%
-      mutate(immune = full - lost) %>%
-      left_join(pop_by_age_gender, by = c("ageRange", "gender")) %>%
+    piramide_tab  %>% 
+      filter(municipio == input$piramide_municipio) %>%
       mutate(onedose = make_col(onedose, poblacion),
              full = make_col(full, poblacion),
              immune = make_col(immune, poblacion),
@@ -308,39 +284,25 @@ server <- function(input, output, session) {
   })
   
   output$mapa <- renderPlot({
-    load(file.path(rda_path, "daily_vax_counts_by_municipio.rda"))
-    load(file.path(rda_path, "population-tabs.rda"))
+    load(file.path(rda_path, "piramide.rda"))
     load(file.path(rda_path, "map.rda"))
+    tab <- piramide_tab %>%
+      filter(!municipio %in% c("Todos", "No reportados"))
     
-    if(input$municipio_agerange=="all"){
-      tab <- daily_vax_counts_by_municipio %>% 
-        filter(gender %in% c("M", "F")) %>%
-        group_by(municipio) %>%
-        summarize(onedose = sum(onedose), full = sum(full),
-                  booster=sum(booster), lost = sum(lost), .groups = "drop") 
-      pop <- pop_by_age_gender_municipio %>% group_by(municipio) %>%
-        summarize(poblacion=sum(poblacion))
-      
-    }  else{
-      tab <- daily_vax_counts_by_municipio %>% 
-        filter(gender %in% c("M", "F") &
-                 ageRange == input$municipio_agerange) %>%
-        group_by(municipio) %>%
-        summarize(onedose = sum(onedose), full = sum(full),
-                  booster=sum(booster), lost = sum(lost), .groups = "drop") 
-      
-      pop <- pop_by_age_gender_municipio %>% 
-        filter(ageRange == input$municipio_agerange) %>%
-        group_by(municipio) %>%
-        summarize(poblacion=sum(poblacion), .groups = "drop") 
-    }
     min_rate <- .40
     max_rate <- .70
+
+    if(input$municipio_agerange != "all"){
+      tab <- tab %>% filter(ageRange == input$municipio_agerange)
+    } 
     
-    tab  %>%
-      mutate(immune = full - lost) %>%
-      left_join(pop , by = c("municipio")) %>%
-      mutate(rate = full/ poblacion) %>%      
+    tab %>%  group_by(municipio) %>%
+        summarize(onedose = sum(onedose),
+                  full = sum(full),
+                  lost = sum(lost),
+                  immune = sum(immune),
+                  poblacion = sum(poblacion), .groups = "drop") %>%
+     mutate(rate = full/ poblacion) %>%      
       mutate(rate = 100*pmin(pmax(rate, min_rate), max_rate)) %>%
       na.omit() %>%
       left_join(map, by = "municipio") %>%
@@ -358,37 +320,25 @@ server <- function(input, output, session) {
   })
   
   output$municipio_tabla <- DT::renderDataTable({
-    load(file.path(rda_path, "daily_vax_counts_by_municipio.rda"))
-    load(file.path(rda_path, "population-tabs.rda"))
+    load(file.path(rda_path, "piramide.rda"))
     
-    if(input$municipio_agerange=="all"){
-      tab <- daily_vax_counts_by_municipio %>% 
-        filter(gender %in% c("M", "F")) %>%
-        group_by(municipio) %>%
-        summarize(onedose = sum(onedose), full = sum(full),
-                  booster=sum(booster), lost = sum(lost), .groups = "drop") 
-      pop <- pop_by_age_gender_municipio %>% group_by(municipio) %>%
-        summarize(poblacion=sum(poblacion))
-      
-    }  else{
-      tab <- daily_vax_counts_by_municipio %>% 
-        filter(gender %in% c("M", "F") &
-                 ageRange == input$municipio_agerange) %>%
-        group_by(municipio) %>%
-        summarize(onedose = sum(onedose), full = sum(full),
-                  booster=sum(booster), lost = sum(lost), .groups = "drop") 
-      
-      pop <- pop_by_age_gender_municipio %>% 
-        filter(ageRange == input$municipio_agerange) %>%
-        group_by(municipio) %>%
-        summarize(poblacion=sum(poblacion), .groups = "drop") 
-    }
+    tab <- piramide_tab %>%
+      filter(!municipio %in% c("Todos","No reportados"))
+    
+    
+    if(input$municipio_agerange != "all"){
+      tab <- tab %>% filter(ageRange == input$municipio_agerange)
+    } 
     
     make_col <- function(x,n) paste0(make_pretty(x), " (", make_pct(x/n,0), ")")
     
-    tab  %>%
-      mutate(immune = full - lost) %>%
-      left_join(pop , by = c("municipio")) %>%
+    tab  %>%  group_by(municipio) %>%
+      summarize(onedose = sum(onedose),
+                full = sum(full),
+                booster = sum(booster),
+                lost = sum(lost),
+                immune = sum(immune),
+                poblacion = sum(poblacion), .groups = "drop") %>%
       arrange(full/poblacion) %>% 
       mutate(oonedose = onedose/poblacion,
              onedose = make_col(onedose, poblacion),

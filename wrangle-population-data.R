@@ -65,18 +65,25 @@ pop_by_age_gender_municipio <-
   mutate(ageRange = cut(age_start, c(age_starts, Inf), right = FALSE, labels = labels)) %>% 
   group_by(municipio, ageRange, gender) %>%
   summarize(poblacion = sum(poblacion), .groups = "drop") %>%
-  mutate(ageRange = factor(ageRange, levels = labels))
+  mutate(ageRange = factor(ageRange, levels = labels))  %>%
+  as.data.table() 
+
 
 correction <- pop_by_age_gender_municipio %>% group_by(ageRange, gender) %>% 
   summarize(poblacion=sum(poblacion), .groups = "drop") %>%
-  left_join(pop_by_age_gender, tmp, by = c("ageRange","gender")) %>%
+  left_join(pop_by_age_gender, by = c("ageRange","gender")) %>%
   mutate(correction = poblacion.y / poblacion.x) %>% 
   select(-contains("poblacion"))
 
-pop_by_age_gender_municipio  %>% left_join(correction, by = c("ageRange", "gender")) %>%
+pop_by_age_gender_municipio <-pop_by_age_gender_municipio  %>%
+  left_join(correction, by = c("ageRange", "gender")) %>%
   mutate(poblacion = poblacion*correction) %>%
-  select(-correction)
+  select(-correction) 
 
+pop_by_age_gender_municipio[,municipio := reorder(municipio, -poblacion, sum)]
+
+muni_order <- pop_by_age_gender_municipio %>%
+  group_by(municipio) %>% summarize(n=sum(poblacion), .groups="drop") 
 save(pr_pop, pr_adult_pop, pop_by_age_gender, pop_by_age_gender_municipio, 
      file = file.path(rda_path, "population-tabs.rda"))
 

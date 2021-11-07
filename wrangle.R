@@ -10,12 +10,11 @@ if(Sys.info()["nodename"] == "fermat.dfci.harvard.edu"){
   rda_path <- "rdas"
 }
 
-
 manu_levels <- c("UNV", "MOD", "PFR", "JSN")
 load(file.path(rda_path, "dat_vax.rda"))
 load(file.path(rda_path, "population-tabs.rda"))
 
-muni_levels <- unique(pop_by_age_gender_municipio$municipio)
+muni_levels <- c(levels(pop_by_age_gender_municipio$municipio), "No reportado")
 
 load(file.path(rda_path, "dates.rda"))
 
@@ -198,13 +197,15 @@ daily_vax_counts_by_municipio <- merge(daily_vax_counts_by_municipio,
 
 daily_vax_counts_by_municipio$ageRange <- factor(daily_vax_counts_by_municipio$ageRange, levels = age_levels)
 
+daily_vax_counts_by_municipio$municipio <- 
+  factor(daily_vax_counts_by_municipio$municipio, levels = muni_levels)
 
 # Other -------------------------------------------------------------------
 
-
-
-unvax <- counts_onedose_age_gender_manu[ , .(total = sum(n)), keyby = .(date, ageRange, gender)]
-unvax <- merge(unvax, pop_by_age_gender, all.x = TRUE, by = c("ageRange", "gender")) 
+unvax <- counts_onedose_age_gender_manu[ , .(total = sum(n)), 
+                                         keyby = .(date, ageRange, gender)]
+unvax <- merge(unvax, pop_by_age_gender, all.x = TRUE, 
+               by = c("ageRange", "gender")) 
 unvax[,n := poblacion - total]
 unvax[,manu := "UNV"]
 unvax <- unvax[,c("date", "ageRange","gender","manu", "n")]
@@ -218,11 +219,12 @@ poblacion$ageRange <- factor(poblacion$ageRange, levels = age_levels)
 
 
 ### by municipio
-
-unvax <- counts_onedose_age_gender_manu_muni[ , .(total = sum(n)), keyby = .(date, ageRange, gender, municipio)]
-unvax <- merge(unvax, pop_by_age_gender_municipio, all.x = TRUE, by = c("ageRange", "gender","municipio")) 
-unvax[,n := poblacion - total]
-unvax[,manu := "UNV"]
+unvax <- counts_onedose_age_gender_manu_muni[ , .(total = sum(n)), 
+                                              keyby = .(date, ageRange, gender, municipio)]
+unvax <- merge(unvax, pop_by_age_gender_municipio, all.x = TRUE, 
+               by = c("ageRange", "gender", "municipio")) 
+unvax[, n := poblacion - total]
+unvax[ ,manu := "UNV"]
 unvax <- unvax[,c("date", "municipio","ageRange","gender","manu", "n")]
 
 poblacion_muni <- rbind(counts_vax_age_gender_manu_muni[,status:="VAX"],
@@ -230,7 +232,60 @@ poblacion_muni <- rbind(counts_vax_age_gender_manu_muni[,status:="VAX"],
                    unvax[,status:="UNV"])
 poblacion_muni$status <- factor(poblacion_muni$status, levels = c("UNV", "PAR", "VAX"))
 poblacion_muni$ageRange <- factor(poblacion_muni$ageRange, levels = age_levels)
+poblacion_muni$municipio <- 
+  factor(poblacion_muni$municipio, levels = muni_levels)
 
+### PIRAMIDE
+tab <- poblacion %>% 
+  filter(date == max(date) & gender %in% c("M","F")) %>%
+  group_by(ageRange, gender, status) %>%
+  summarize(n = sum(n), .groups = "drop") %>%
+  mutate(n = pmax(0, n)) %>%
+  mutate(n = ifelse(gender=="M", -n, n)) %>%
+  arrange(gender, ageRange) %>%
+  mutate(n = n/sum(abs(n))) %>%
+  mutate(etatus = recode(status, UNV = "No vacunados", PAR = "Parcial", VAX = "Vacunados")) %>%
+  rename(estatus = status) %>%
+  mutate(municipio = "Todos")
+
+tab_muni <- poblacion_muni %>%
+  filter(municipio!="No reportado") %>%
+  filter(date == max(date) & gender %in% c("M","F")) %>%
+  group_by(municipio, ageRange, gender, status) %>%
+  summarize(n = sum(n), .groups = "drop") %>%
+  mutate(n = pmax(0, n)) %>%
+  mutate(n = ifelse(gender=="M", -n, n)) %>%
+  arrange(municipio, gender, ageRange) %>%
+  group_by(municipio) %>%
+  mutate(n = n/sum(abs(n))) %>%
+  ungroup() %>%
+  mutate(etatus = recode(status, UNV = "No vacunados", PAR = "Parcial", VAX = "Vacunados")) %>%
+  rename(estatus = status) 
+  
+piramide <- bind_rows(tab, tab_muni)
+
+
+## piramide tab
+
+piramide_tab <- daily_vax_counts %>% 
+  filter(gender %in% c("M", "F")) %>%
+  group_by(ageRange, gender) %>%
+  summarize(onedose = sum(onedose), full = sum(full),
+            booster=sum(booster), lost = sum(lost), .groups = "drop") %>%
+  mutate(immune = full - lost) %>%
+  left_join(pop_by_age_gender, by = c("ageRange", "gender")) %>%
+  mutate(municipio = "Todos")
+
+piramide_tab_muni <- daily_vax_counts_by_municipio %>% 
+  filter(gender %in% c("M", "F") & municipio!="No reportado") %>%
+  group_by(municipio, ageRange, gender) %>%
+  summarize(onedose = sum(onedose), full = sum(full),
+            booster=sum(booster), lost = sum(lost), .groups = "drop") %>%
+  mutate(immune = full - lost) %>%
+  left_join(pop_by_age_gender_municipio, by = c("municipio","ageRange", "gender"))
+
+piramide_tab <- bind_rows(piramide_tab, piramide_tab_muni)
+  
 rm(daily_counts_onedose_age_gender_manu, 
    daily_counts_booster_age_gender_manu,
    daily_counts_lost_age_gender_manu,
@@ -244,7 +299,9 @@ rm(daily_counts_onedose_age_gender_manu,
    daily_counts_vax_age_gender_manu_muni,
    counts_onedose_age_gender_manu_muni, 
    counts_partial_age_gender_manu_muni, 
-   counts_vax_age_gender_manu_muni)
+   counts_vax_age_gender_manu_muni,
+   piramide_tab_muni,
+   tab, tab_muni)
 
 ## cases
 load(file.path(rda_path, "dat_cases_vax.rda"))
@@ -387,3 +444,4 @@ save(daily_vax_counts, file = file.path(rda_path, "daily_vax_counts.rda"))
 save(daily_vax_counts_by_municipio, file = file.path(rda_path, "daily_vax_counts_by_municipio.rda"))
 save(dat_cases, file =  file.path(rda_path ,"dat_cases.rda"))
 save(immune, file = file.path(rda_path ,"immune.rda"))
+save(piramide, piramide_tab, file = file.path(rda_path, "piramide.rda"))
