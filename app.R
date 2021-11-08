@@ -143,6 +143,7 @@ ui <- fluidPage(
 server <- function(input, output, session) {
     
   output$fecha <- renderText({
+  load(file.path(rda_path, "dates.rda"))
     paste0("<h4>Datos para ", 
            format(last_day, "%B %d, %Y:"), "</h4>")})
   
