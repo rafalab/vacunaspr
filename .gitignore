@@ -20,3 +20,7 @@ rdas/bp_preis_matches_today.rds
 rdas/dat_vax.rds
 run_ALL.R
 .Rhistory
+preis_connection.R
+preis_credentials.R
+rdas/vax_data_preis.rda
+.Rhistory
