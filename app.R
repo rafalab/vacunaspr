@@ -81,7 +81,7 @@ ui <- fluidPage(
                                        "Municipio",
                                        choice = c(Todos = "Todos",
                                                   municipios),
-                                       selected = "all"),
+                                       selected = "Todos"),
                            width = 3),
                          mainPanel(
                            plotOutput("piramide"),
@@ -276,7 +276,7 @@ server <- function(input, output, session) {
     
     tab <- filter(piramide, municipio == input$piramide_municipio)
     
-    mun <- recode(input$piramide_municipio, all = "Puerto Rico")
+    mun <- recode(input$piramide_municipio, Todos = "Puerto Rico")
     tab %>%
       ggplot(aes(ageRange, n, fill = estatus)) +
       geom_bar(position = "stack", stat = "identity", color = I("black"), width = 1) +
