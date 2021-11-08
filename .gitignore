@@ -19,3 +19,4 @@ rdas/bp_preis_map.rda
 rdas/bp_preis_matches_today.rds
 rdas/dat_vax.rds
 run_ALL.R
+.Rhistory
