@@ -34,15 +34,15 @@ dat_vax$manu_1 <- droplevels(dat_vax$manu_1)
 dat_vax$manu_2 <- droplevels(dat_vax$manu_2)
 dat_vax$manu_3 <- droplevels(dat_vax$manu_3)
 
-dat_vax[estado %in% c("PR", "No reportado") , c("vax_date", "booster_date", "booster_manu") := .(date_2, date_3, manu_3)]
+dat_vax[estado %in% c("PR", "No reportado") , c("vax_date", "booster_date", "booster_manu", "booster_insert_date", "booster_proveedor", "booster_ageRange") := .(date_2, date_3, manu_3, insert_date_3, proveedor_3, ageRange_3)]
 dat_vax[manu_1 == "JSN", 
-        c("vax_date", "booster_date", "ageRange_2", "manu_2", "booster_manu") := .(date_1, date_2, ageRange_1, manu_1, manu_2)]
+        c("vax_date", "booster_date", "ageRange_2", "manu_2", "booster_manu", "booster_insert_date", "booster_proveedor", "booster_ageRange") := .(date_1, date_2, ageRange_1, manu_1, manu_2, date_2, proveedor_2, ageRange_2)]
 dat_vax[!is.na(vax_date), vax_date := vax_date + days(14)]
 dat_vax[vax_date > today(), vax_date := NA] ## not fully vax yet
 
 ## to early to be a booster
-dat_vax[!is.na(booster_date) & manu_2 != "JSN" & booster_date < make_date(2021, 8, 13), c("booster_date", "booster_manu") := .(NA, NA)]
-dat_vax[!is.na(booster_date) & manu_2 == "JSN" & booster_date < make_date(2021, 10, 22), c("booster_date", "booster_manu") := .(NA, NA)]
+dat_vax[!is.na(booster_date) & manu_2 != "JSN" & booster_date < make_date(2021, 8, 13), c("booster_date", "booster_manu", "booster_insert_date", "booster_proveedor", "booster_ageRange") := .(NA, NA, NA, NA, NA)]
+dat_vax[!is.na(booster_date) & manu_2 == "JSN" & booster_date < make_date(2021, 10, 22), c("booster_date", "booster_manu", "booster_insert_date", "booster_proveedor", "booster_ageRange") := .(NA, NA, NA, NA, NA)]
 
 ## last data without needing a booster
 dat_vax[is.na(booster_date) & !is.na(vax_date) & manu_2 != "JSN", last_immune_date := date_2 + months(6)]
@@ -437,6 +437,23 @@ totals <- bind_rows(totals, totals_booster)
 
 outcome_tab <- left_join(outcome_tab, totals, by = c("manu", "status"))
 
+## Proveedores
+
+the_colnames <- c("date", "manu", "insert_date", "proveedor", "ageRange")
+proveedores <- bind_rows(
+  mutate(dose = "Primera", setNames(select(dat_vax, contains("_1")), the_colnames)),
+  mutate(dose = "Segunda", setNames(select(dat_vax, contains("_2")), the_colnames)),
+  mutate(dose = "Booster", setNames(select(dat_vax, contains("booster")), the_colnames))) %>%
+  mutate(diff = as.numeric(insert_date) - as.numeric(date)) %>%
+  filter(!is.na(proveedor) & !(dose=="Segunada" & manu == "JSN")) %>%
+  group_by(proveedor, dose, manu, ageRange) %>%
+  summarize(total = n(), 
+            rezago = mean(diff),
+            entradas_esta_semana = sum(insert_date >= today() - weeks(1)),
+            rezago_esta_semana = mean(diff[insert_date >= today() - weeks(1)]),
+            .groups = "drop")
+
+save(proveedores, file=file.path(rda_path ,"proveedores.rda"))
 save(counts, file=file.path(rda_path ,"counts.rda"))
 save(summary_tab, outcome_tab, file=file.path(rda_path ,"tabs.rda"))
 save(poblacion, poblacion_muni, file = file.path(rda_path ,"poblacion.rda"))

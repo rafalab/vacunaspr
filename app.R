@@ -73,6 +73,7 @@ ui <- fluidPage(
                          )
                        )),
               
+             
               tabPanel("Pirámide",
                        sidebarLayout(
                          sidebarPanel(
@@ -85,6 +86,33 @@ ui <- fluidPage(
                          mainPanel(
                            plotOutput("piramide"),
                            htmlOutput("piramide_tabla")
+                         )
+                       )),
+              tabPanel("Proveedores",
+                       sidebarLayout(
+                         sidebarPanel(
+                           selectInput("proveedor_agerange",
+                                       "Grupo de Edad",
+                                       choice = c("Agregados" = "all",
+                                                  age_levels[-1]),
+                                       selected = "Todos"),
+                           selectInput("proveedor_dose",
+                                       "Dosis",
+                                       choice = c("Agregadas" = "all",
+                                                  "Primera" = "Primera",
+                                                  "Segunda" = "Segunda",
+                                                  "Booster" = "Booster"),
+                                       selected = "all"),
+                           selectInput("proveedor_manu",
+                                       "Tipo de vacuna",
+                                       choice = c("Agregados" = "all",
+                                                  "Pfizer" = "PFR",
+                                                  "Moderna" = "MOD",
+                                                  "J&J" = "JSN"),
+                                       selected = "all"),
+                           width = 3),
+                         mainPanel(
+                           htmlOutput("proveedores")
                          )
                        )),
               tabPanel("Datos Diarios", 
@@ -368,6 +396,28 @@ server <- function(input, output, session) {
   }, 
   server = FALSE)
   
+  output$proveedores <- renderText({
+    load(file.path(rda_path,"proveedores.rda"))
+
+    if(input$proveedor_agerange != "all") proveedores <- filter(proveedores, ageRange == input$proveedor_agerange)
+    if(input$proveedor_manu != "all") proveedores <- filter(proveedores, manu == input$proveedor_manu)
+    if(input$proveedor_dose != "all") proveedores <- filter(proveedores, dose == input$proveedor_dose)
+    
+    proveedores %>% 
+      group_by(proveedor) %>%
+      summarize(rezago = round(sum(total*rezago, na.rm=TRUE)/sum(total, na.rm=TRUE)),
+                total = sum(total),
+                rezago_esta_semana = round(sum(entradas_esta_semana*rezago_esta_semana, na.rm=TRUE)/sum(entradas_esta_semana,na.rm=TRUE)),
+                entradas_esta_semana = sum(entradas_esta_semana)) %>%
+      mutate(o = ifelse(proveedor == "Otros", -Inf, total)) %>%  
+      arrange(desc(o)) %>%
+      select(-o) %>%
+      mutate(total = make_pretty(total), entradas_esta_semana = make_pretty(entradas_esta_semana)) %>%
+      select(proveedor, total, rezago, entradas_esta_semana, rezago_esta_semana) %>%
+      setNames(c("Proveedor", "Vacunas administradas", "Rezago medio (días)", "Entradas última semana","Rezago última semana")) %>% 
+      kableExtra::kbl(align = c("l","r", "r","r", "r", "r"))  %>% 
+      kableExtra::kable_styling()
+  })
   output$tabla <- DT::renderDataTable({
     load(file.path(rda_path, "counts.rda"))
     
