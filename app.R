@@ -72,7 +72,7 @@ ui <- fluidPage(
                            DT::dataTableOutput("municipio_tabla")
                          )
                        )),
-              
+             
              
               tabPanel("Pirámide",
                        sidebarLayout(
@@ -131,7 +131,48 @@ ui <- fluidPage(
                            DT::dataTableOutput("tabla")
                          )
                        )
-              )
+              ), 
+              tabPanel("Dosis en el tiempo",
+                       sidebarLayout(
+                         sidebarPanel(
+                           selectInput("time_type",
+                                       "Tipo de gráfico",
+                                       choice = c(Acumulado = "total",
+                                                  Diario = "daily"),
+                                       selected = "total"),
+                           selectInput("status_type",
+                                       "Estado de vacunación",
+                                       choice = c(`Completamente vacunados` = "full",
+                                                  `Una dosis` = "onedose",
+                                                  `Dosis de refuerzo` = "booster", 
+                                                  `Sin necesidad de dosis de refuerzo` = "immunized"),
+                                       selected = "full"),
+                           selectInput("manu_type",
+                                       "Tipo de vacuna",
+                                       choice = c(`J&J` = "JSN",
+                                                  `Pfizer` = "PFR",
+                                                  `Moderna` = "MOD", 
+                                                  `Todas` = "all", 
+                                                  `Agregadas` = "together"),
+                                       selected = "together"), 
+                           dateRangeInput("dose_timerange", "Periodo", 
+                                          start = last_day - days(240),
+                                          end = last_day,
+                                          format = "M-dd-yyyy",
+                                          language = "es",
+                                          width = "100%",
+                                          min = first_day,
+                                          max = last_day),
+                           selectInput("dose_agerange",
+                                       "Grupo de Edad",
+                                       choice = c("Agregados" = "all",
+                                                  "Todos" = "facet",
+                                                  rev(age_levels[-1])),
+                                       selected = "all"),
+                           width = 3),
+                         mainPanel(
+                           plotOutput("people_plot"))
+                       ))
   ),
   htmlOutput("update"),
 )
@@ -447,7 +488,180 @@ server <- function(input, output, session) {
   },
   server = FALSE
 )
-  
+  output$people_plot <- renderPlot({
+    load(file.path(rda_path, "total_daily_vax_counts.rda"))
+    
+    the_title <- case_when(
+      input$status_type == "full" ~ "Cantidad de personas que completan serie de vacunación por día",
+      input$status_type == "onedose" ~ "Cantidad de personas con una dosis por día",
+      input$status_type == "booster" ~ "Cantidad de personas con dosis de refuerzo por día", 
+      input$status_type == "immunized" ~ "Cantidad de personas sin necesidad de dosis de refuerzo por día")
+    
+    if(input$manu_type=="all"){
+      total_daily_vax_counts
+      labels_manu <- c( manu_labels[["JSN"]], manu_labels[["MOD"]],
+                        manu_labels[["PFR"]])
+      values_manu <- c(manu_colors[["JSN"]], manu_colors[["MOD"]],
+                       manu_colors[["PFR"]])
+      fill_name = "Vacunas:"
+      legend_pstn = "bottom"
+    } else if (input$manu_type =="together"){
+      total_daily_vax_counts$manu <- "together"
+      labels_manu <- c("Vacunas agregadas: Pfizer, Moderna y J&J")
+      values_manu <- c("darkgray")
+      fill_name = NULL
+      legend_pstn = "none"
+    } else {
+      total_daily_vax_counts <- total_daily_vax_counts %>% filter(manu %in% c(input$manu_type))
+      labels_manu <- c( manu_labels[[input$manu_type]])
+      values_manu <- c(manu_colors[[input$manu_type]])
+      fill_name = "Vacunas:"
+      legend_pstn = "bottom"
+    }
+    
+    if(input$dose_agerange %in% c("all", "facet")){
+      total_daily_vax_counts <- filter(total_daily_vax_counts, ageRange != "0-4") %>%
+        mutate(ageRange = droplevels(ageRange))} else{
+          total_daily_vax_counts <- filter(total_daily_vax_counts, ageRange == input$dose_agerange)
+        }
+    
+    if(input$dose_agerange == "all") { total_daily_vax_counts$ageRange<-"all"
+    
+    if(input$time_type == "daily") {
+      
+      tmp <- total_daily_vax_counts %>%
+        filter(date >=input$dose_timerange[1] & date <= input$dose_timerange[2]) %>%
+        filter(status_type == input$status_type) %>%
+        mutate(outcome = !!sym(input$time_type)) %>%
+        group_by(date) %>%
+        summarize(outcome2 = sum(outcome),.groups = "drop") %>%
+        mutate(rate =  ma7(date, outcome2, k = 14)$moving_avg) 
+      
+      g <- total_daily_vax_counts %>%
+        filter(date >= input$dose_timerange[1] & date <= input$dose_timerange[2]) %>%
+        filter(status_type == input$status_type) %>%
+        mutate(outcome = !!sym(input$time_type)) %>%
+        full_join(tmp) %>%
+        ggplot(aes(x=date, y=outcome, fill=manu))+ geom_col()+
+        geom_line(aes(y=rate), size = 1)+
+        scale_y_continuous(labels = scales::comma)+
+        labs(x="Fecha", y="Cantidad de personas", title = the_title, 
+             caption = "Curva (en negro) es la media móvil de 14 días")+
+        scale_fill_manual(
+          labels = labels_manu,
+          values = values_manu, 
+          name=fill_name) +
+        theme_bw()+
+        theme(legend.position = legend_pstn, text = element_text(size = 15))
+    } else {
+      g <- total_daily_vax_counts %>%
+        filter(date >= input$dose_timerange[1] & date <= input$dose_timerange[2]) %>%
+        filter(status_type == input$status_type) %>%
+        mutate(outcome = !!sym(input$time_type)) %>%
+        ggplot(aes(x=date, y=outcome, fill=manu))+ geom_col()+
+        scale_y_continuous(labels = scales::comma)+
+        labs(x="Fecha", y="Cantidad de personas", title = the_title)+
+        scale_fill_manual(
+          labels = labels_manu,
+          values = values_manu, 
+          name=fill_name) +
+        theme_bw()+
+        theme(legend.position = legend_pstn, text = element_text(size = 15))
+    } 
+    return(g)
+    } 
+    if(input$dose_agerange == "facet") 
+    {      if(input$time_type == "daily") {
+      
+      tmp <- total_daily_vax_counts %>%
+        filter(date >=input$dose_timerange[1] & date <= input$dose_timerange[2]) %>%
+        filter(status_type == input$status_type) %>%
+        group_by(date, ageRange) %>%
+        mutate(outcome = !!sym(input$time_type)) %>%
+        summarize(outcome2 = sum(outcome),.groups = "drop") %>%
+        group_by(ageRange) %>%
+        mutate(rate =  ma7(date, outcome2, k = 14)$moving_avg) %>% 
+        ungroup()
+      
+      g <- total_daily_vax_counts %>%
+        filter(date >= input$dose_timerange[1] & date <= input$dose_timerange[2]) %>%
+        filter(status_type == input$status_type) %>%
+        mutate(outcome = !!sym(input$time_type)) %>%
+        full_join(tmp) %>%
+        ggplot(aes(x=date, y=outcome, fill=manu))+ geom_col()+
+        geom_line(aes(y=rate), size = 1)+ facet_wrap(~ageRange)+
+        scale_y_continuous(labels = scales::comma)+
+        labs(x="Fecha", y="Cantidad de personas", title = the_title, 
+             caption = "Curva (en negro) es la media móvil de 14 días")+
+        scale_fill_manual(
+          labels = labels_manu,
+          values = values_manu, 
+          name=fill_name) +
+        theme_bw()+
+        theme(legend.position = legend_pstn, text = element_text(size = 15))
+    } else {
+      g <- total_daily_vax_counts %>%
+        filter(date >= input$dose_timerange[1] & date <= input$dose_timerange[2]) %>%
+        filter(status_type == input$status_type) %>%
+        mutate(outcome = !!sym(input$time_type)) %>%
+        ggplot(aes(x=date, y=outcome, fill=manu))+ geom_col()+ facet_wrap(~ageRange)+
+        scale_y_continuous(labels = scales::comma)+
+        labs(x="Fecha", y="Cantidad de personas", title = the_title)+
+        scale_fill_manual(
+          labels = labels_manu,
+          values = values_manu, 
+          name=fill_name) +
+        theme_bw()+
+        theme(legend.position = legend_pstn, text = element_text(size = 15))
+    }
+      return(g)
+    }
+    
+    else {
+      if(input$time_type == "daily") {
+        
+        tmp <- total_daily_vax_counts %>%
+          filter(date >=input$dose_timerange[1] & date <= input$dose_timerange[2]) %>%
+          filter(status_type == input$status_type) %>%
+          mutate(outcome = !!sym(input$time_type)) %>%
+          group_by(date) %>%
+          summarize(outcome2 = sum(outcome),.groups = "drop") %>%
+          mutate(rate =  ma7(date, outcome2, k = 14)$moving_avg) 
+        
+        g <- total_daily_vax_counts %>%
+          filter(date >= input$dose_timerange[1] & date <= input$dose_timerange[2]) %>%
+          filter(status_type == input$status_type) %>%
+          mutate(outcome = !!sym(input$time_type)) %>%
+          full_join(tmp) %>%
+          ggplot(aes(x=date, y=outcome, fill=manu))+ geom_col()+
+          geom_line(aes(y=rate), size = 1)+
+          scale_y_continuous(labels = scales::comma)+
+          labs(x="Fecha", y="Cantidad de personas", title = the_title, 
+               caption = "Curva (en negro) es la media móvil de 14 días")+
+          scale_fill_manual(
+            labels = labels_manu,
+            values = values_manu, 
+            name=fill_name) +
+          theme_bw()+
+          theme(legend.position = legend_pstn, text = element_text(size = 15))
+      } else {
+        g <- total_daily_vax_counts %>%
+          filter(date >= input$dose_timerange[1] & date <= input$dose_timerange[2]) %>%
+          filter(status_type == input$status_type) %>%
+          mutate(outcome = !!sym(input$time_type)) %>%
+          ggplot(aes(x=date, y=outcome, fill=manu))+ geom_col()+
+          scale_y_continuous(labels = scales::comma)+
+          labs(x="Fecha", y="Cantidad de personas", title = the_title)+
+          scale_fill_manual(
+            labels = labels_manu,
+            values = values_manu, 
+            name=fill_name) +
+          theme_bw()+
+          theme(legend.position = legend_pstn, text = element_text(size = 15))
+      } 
+      return(g)
+    }
+  })
   
 }
 
