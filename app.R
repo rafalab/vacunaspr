@@ -69,6 +69,7 @@ ui <- fluidPage(
                            width = 3),
                          mainPanel(
                            plotOutput("mapa"),
+                           leafletOutput("mapa_leaflet"),
                            DT::dataTableOutput("municipio_tabla")
                          )
                        )),
@@ -347,6 +348,65 @@ server <- function(input, output, session) {
       theme_void() +
       theme(legend.position = "bottom")
   })
+  
+  output$mapa_leaflet <- renderLeaflet({
+    load(file.path(rda_path, "piramide.rda"))
+    load(file.path(rda_path, "map.rda"))
+    tab <- piramide_tab %>%
+      filter(!municipio %in% c("Todos", "No reportados"))
+    
+    min_rate <- .40
+    max_rate <- .70
+    
+    if(input$municipio_agerange != "all"){
+      tab <- tab %>% filter(ageRange == input$municipio_agerange)
+    } 
+    
+    pal <- colorNumeric(palette=rev(RColorBrewer::brewer.pal(9, "Reds")), 
+                        domain=c(100*min_rate, 100*max_rate))
+    
+    tab %>%  group_by(municipio) %>%
+      summarize(onedose = sum(onedose),
+                full = sum(full),
+                lost = sum(lost),
+                immune = sum(immune),
+                poblacion = sum(poblacion), .groups = "drop") %>%
+      mutate(rate = full/ poblacion) %>%
+      mutate(rate = 100*pmin(pmax(rate, min_rate), max_rate)) %>%
+      na.omit() %>%
+    #   left_join(map, by = "municipio") # %>%
+    # data_obj %>%
+    sp::merge(map_sp, ., by.x = "NAME", by.y = "municipio") %>%
+    
+    
+    leaflet() %>%
+    setView(-66.30, 18.2208, 8.1) %>%
+    addTiles(providers$CartoDB.Positron) %>%
+    addPolygons(
+      fillColor = ~pal(rate),
+      weight = 2,
+      opacity = 1,
+      color = "white",
+      dashArray = "3",
+      fillOpacity = 0.7,
+      highlightOptions = highlightOptions(
+        weight = 5,
+        color = "#666",
+        dashArray = "",
+        fillOpacity = 1.0,
+        bringToFront = TRUE))# + 
+      # geom_polygon(aes(x = X, y = Y, group = paste(municipio, part), fill = rate), color = "black", size = 0.15) + 
+      # geom_text(mapping = aes(x = X, y = Y, label = municipio), data = map_centers,
+      #           size  = 2.0,
+      #           color = "black") +
+      # scale_fill_gradientn(colors = rev(RColorBrewer::brewer.pal(9, "Reds")),
+      #                      name = "Por ciento con dosis completa:",
+      #                      limits= c(100*min_rate, 100*max_rate)) +
+      # coord_map() +
+      # theme_void() +
+      # theme(legend.position = "bottom")
+  })
+  
   
   output$municipio_tabla <- DT::renderDataTable({
     load(file.path(rda_path, "piramide.rda"))
