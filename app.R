@@ -541,7 +541,7 @@ server <- function(input, output, session) {
         filter(date >= input$dose_timerange[1] & date <= input$dose_timerange[2]) %>%
         filter(status_type == input$status_type) %>%
         mutate(outcome = !!sym(input$time_type)) %>%
-        full_join(tmp) %>%
+        full_join(tmp, by = "date") %>%
         ggplot(aes(x=date, y=outcome, fill=manu))+ geom_col()+
         geom_line(aes(y=rate), size = 1)+
         scale_y_continuous(labels = scales::comma)+
