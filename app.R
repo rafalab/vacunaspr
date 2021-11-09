@@ -58,6 +58,47 @@ ui <- fluidPage(
                             DT::dataTableOutput("muertes_tabla"))
                          )),
               
+              tabPanel("Gráficas",
+                       sidebarLayout(
+                         sidebarPanel(
+                           selectInput("time_type",
+                                       "Tipo de gráfico",
+                                       choice = c(Acumulado = "total",
+                                                  Diario = "daily"),
+                                       selected = "total"),
+                           selectInput("status_type",
+                                       "Estado de vacunación",
+                                       choice = c(`Una dosis` = "onedose",
+                                                  `Completa` = "full",
+                                                  `Booster` = "booster", 
+                                                  `Sin necesidad de booster` = "immunized"),
+                                       selected = "full"),
+                           selectInput("manu_type",
+                                       "Tipo de vacuna",
+                                       choice = c(`Pfizer` = "PFR",
+                                                  `Moderna` = "MOD", 
+                                                  `J&J` = "JSN",
+                                                  `Todas` = "all", 
+                                                  `Agregadas` = "together"),
+                                       selected = "together"), 
+                           dateRangeInput("dose_timerange", "Periodo", 
+                                          start = last_day - days(240),
+                                          end = last_day,
+                                          format = "M-dd-yyyy",
+                                          language = "es",
+                                          width = "100%",
+                                          min = first_day,
+                                          max = last_day),
+                           selectInput("dose_agerange",
+                                       "Grupo de Edad",
+                                       choice = c("Agregados" = "all",
+                                                  "Todos" = "facet",
+                                                  rev(age_levels[-1])),
+                                       selected = "all"),
+                           width = 3),
+                         mainPanel(
+                           plotOutput("people_plot"))
+                       )),
               tabPanel("Municipios",
                        sidebarLayout(
                          sidebarPanel(
@@ -100,7 +141,7 @@ ui <- fluidPage(
                                        "Dosis",
                                        choice = c("Agregadas" = "all",
                                                   "Primera" = "Primera",
-                                                  "Segunda" = "Segunda",
+                                                  "Completa" = "Segunda",
                                                   "Booster" = "Booster"),
                                        selected = "all"),
                            selectInput("proveedor_manu",
@@ -131,49 +172,8 @@ ui <- fluidPage(
                            DT::dataTableOutput("tabla")
                          )
                        )
-              ), 
-              tabPanel("Dosis en el tiempo",
-                       sidebarLayout(
-                         sidebarPanel(
-                           selectInput("time_type",
-                                       "Tipo de gráfico",
-                                       choice = c(Acumulado = "total",
-                                                  Diario = "daily"),
-                                       selected = "total"),
-                           selectInput("status_type",
-                                       "Estado de vacunación",
-                                       choice = c(`Completamente vacunados` = "full",
-                                                  `Una dosis` = "onedose",
-                                                  `Dosis de refuerzo` = "booster", 
-                                                  `Sin necesidad de dosis de refuerzo` = "immunized"),
-                                       selected = "full"),
-                           selectInput("manu_type",
-                                       "Tipo de vacuna",
-                                       choice = c(`J&J` = "JSN",
-                                                  `Pfizer` = "PFR",
-                                                  `Moderna` = "MOD", 
-                                                  `Todas` = "all", 
-                                                  `Agregadas` = "together"),
-                                       selected = "together"), 
-                           dateRangeInput("dose_timerange", "Periodo", 
-                                          start = last_day - days(240),
-                                          end = last_day,
-                                          format = "M-dd-yyyy",
-                                          language = "es",
-                                          width = "100%",
-                                          min = first_day,
-                                          max = last_day),
-                           selectInput("dose_agerange",
-                                       "Grupo de Edad",
-                                       choice = c("Agregados" = "all",
-                                                  "Todos" = "facet",
-                                                  rev(age_levels[-1])),
-                                       selected = "all"),
-                           width = 3),
-                         mainPanel(
-                           plotOutput("people_plot"))
-                       ))
-  ),
+              ) 
+            ),
   htmlOutput("update"),
 )
               
@@ -558,7 +558,8 @@ server <- function(input, output, session) {
         filter(date >= input$dose_timerange[1] & date <= input$dose_timerange[2]) %>%
         filter(status_type == input$status_type) %>%
         mutate(outcome = !!sym(input$time_type)) %>%
-        ggplot(aes(x=date, y=outcome, fill=manu))+ geom_col()+
+        ggplot(aes(x=date, y=outcome, fill=manu))+ 
+        geom_col()+
         scale_y_continuous(labels = scales::comma)+
         labs(x="Fecha", y="Cantidad de personas", title = the_title)+
         scale_fill_manual(
