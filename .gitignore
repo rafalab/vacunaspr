@@ -24,3 +24,4 @@ preis_connection.R
 preis_credentials.R
 rdas/vax_data_preis.rda
 .Rhistory
+.DS_Store
