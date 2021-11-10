@@ -455,9 +455,11 @@ server <- function(input, output, session) {
         style = list("font-weight" = "normal", padding = "3px 8px"),
         textsize = "15px",
         direction = "auto")) %>%
-      addLegend(pal = pal, values = c(min_rate*100, max_rate*100), opacity = 1.0,
-                title = "Por ciento<br>con dosis completa", bins=4,
-                position = "topright")
+      addLegendNumeric(pal = pal, values = c(min_rate*100, max_rate*100),
+                title = "Población con dosis completa", bins=4,
+                position = "bottomright", orientation='horizontal',
+                numberFormat = function(x) {make_pct(x/100,0)},
+                height=20, width=150)
     
       # + 
       # geom_polygon(aes(x = X, y = Y, group = paste(municipio, part), fill = rate), color = "black", size = 0.15) + 

@@ -3,6 +3,7 @@ library(kableExtra)
 library(tidyverse)
 library(lubridate)
 library(leaflet)
+library(leaflegend)
 source("functions.R")
 
 
