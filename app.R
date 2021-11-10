@@ -411,7 +411,7 @@ server <- function(input, output, session) {
     pal <- colorNumeric(palette=rev(RColorBrewer::brewer.pal(9, "Reds")), 
                         domain=c(100*min_rate, 100*max_rate))
     
-    tab %>%  group_by(municipio) %>%
+    map_obj <- tab %>%  group_by(municipio) %>%
       summarize(onedose = sum(onedose),
                 full = sum(full),
                 lost = sum(lost),
@@ -422,15 +422,21 @@ server <- function(input, output, session) {
       na.omit() %>%
     #   left_join(map, by = "municipio") # %>%
     # data_obj %>%
-    sp::merge(map_sp, ., by.x = "NAME", by.y = "municipio") %>%
+    sp::merge(map_sp, ., by.x = "NAME", by.y = "municipio")
     
+    labels <- sprintf(
+      "<strong>%s</strong><br/>%.0f%% con dosis completa",
+      map_obj@data$NAME, map_obj@data$rate
+    ) %>% lapply(htmltools::HTML)
     
+    map_obj %>%
     leaflet(options = leafletOptions(maxZoom = 10)) %>%
     # setView(-66.25789, 18.22132, 8.1) %>%
     fitBounds(lng1=-67.27135, lat1=17.92687,
                  lng2=-65.24442, lat2=18.51576,
               options = list(padding = c(0,0))) %>%
     # addTiles(providers$CartoDB.Positron) %>%
+    
     addPolygons(
       fillColor = ~pal(rate),
       weight = 0.15,
@@ -443,7 +449,17 @@ server <- function(input, output, session) {
         color = "#666",
         dashArray = "",
         fillOpacity = 1.0,
-        bringToFront = TRUE))# + 
+        bringToFront = TRUE),
+      label = labels,
+      labelOptions = labelOptions(
+        style = list("font-weight" = "normal", padding = "3px 8px"),
+        textsize = "15px",
+        direction = "auto")) %>%
+      addLegend(pal = pal, values = c(min_rate*100, max_rate*100), opacity = 1.0,
+                title = "Por ciento<br>con dosis completa", bins=4,
+                position = "topright")
+    
+      # + 
       # geom_polygon(aes(x = X, y = Y, group = paste(municipio, part), fill = rate), color = "black", size = 0.15) + 
       # geom_text(mapping = aes(x = X, y = Y, label = municipio), data = map_centers,
       #           size  = 2.0,
