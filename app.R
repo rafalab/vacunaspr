@@ -19,6 +19,11 @@ ui <- fluidPage(
   #-- Google analytics add on
   tags$head(includeHTML(("google-analytics.html"))),
   
+  # CSS
+  tags$head(tags$style(HTML(".leaflet-container {
+    background-color:rgba(255,255,255,1.0);
+  }"))),
+  
   # Application title
   titlePanel("Informe de vacunas COVID-19 en Puerto Rico (en construcción)"),
   
@@ -420,16 +425,19 @@ server <- function(input, output, session) {
     sp::merge(map_sp, ., by.x = "NAME", by.y = "municipio") %>%
     
     
-    leaflet() %>%
-    setView(-66.30, 18.2208, 8.1) %>%
-    addTiles(providers$CartoDB.Positron) %>%
+    leaflet(options = leafletOptions(maxZoom = 10)) %>%
+    # setView(-66.25789, 18.22132, 8.1) %>%
+    fitBounds(lng1=-67.27135, lat1=17.92687,
+                 lng2=-65.24442, lat2=18.51576,
+              options = list(padding = c(0,0))) %>%
+    # addTiles(providers$CartoDB.Positron) %>%
     addPolygons(
       fillColor = ~pal(rate),
-      weight = 2,
+      weight = 0.15,
       opacity = 1,
-      color = "white",
-      dashArray = "3",
-      fillOpacity = 0.7,
+      color = "black",
+      dashArray = "",
+      fillOpacity = 1.0,
       highlightOptions = highlightOptions(
         weight = 5,
         color = "#666",
