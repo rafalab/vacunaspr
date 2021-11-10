@@ -422,11 +422,11 @@ server <- function(input, output, session) {
       na.omit() %>%
     #   left_join(map, by = "municipio") # %>%
     # data_obj %>%
-    sp::merge(map_sp, ., by.x = "NAME", by.y = "municipio")
+    sp::merge(map_detail_sp, ., by.x = "Municipio", by.y = "municipio")
     
     labels <- sprintf(
       "<strong>%s</strong><br/>%.0f%% con dosis completa",
-      map_obj@data$NAME, map_obj@data$rate
+      map_obj@data$Municipio, map_obj@data$rate
     ) %>% lapply(htmltools::HTML)
     
     map_obj %>%
@@ -439,7 +439,7 @@ server <- function(input, output, session) {
     
     addPolygons(
       fillColor = ~pal(rate),
-      weight = 0.15,
+      weight = 1,
       opacity = 1,
       color = "black",
       dashArray = "",
@@ -455,8 +455,8 @@ server <- function(input, output, session) {
         style = list("font-weight" = "normal", padding = "3px 8px"),
         textsize = "15px",
         direction = "auto")) %>%
-      addLegendNumeric(pal = pal, values = c(min_rate*100, max_rate*100),
-                title = "Población con dosis completa", bins=4,
+      addLegendNumeric(pal = pal, values = map_obj@data$rate,
+                title = "Población con dosis completa", bins=7,
                 position = "bottomright", orientation='horizontal',
                 numberFormat = function(x) {make_pct(x/100,0)},
                 height=20, width=150)
