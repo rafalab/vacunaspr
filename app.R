@@ -420,17 +420,19 @@ server <- function(input, output, session) {
       mutate(rate = full/ poblacion) %>%
       mutate(rate = 100*pmin(pmax(rate, min_rate), max_rate)) %>%
       na.omit() %>%
-    #   left_join(map, by = "municipio") # %>%
+      # left_join(map, by = "municipio") %>%
+      # rename(lng = X, lat = Y) %>%
+      # as.data.frame()
     # data_obj %>%
-    sp::merge(map_detail_sp, ., by.x = "Municipio", by.y = "municipio")
+    sp::merge(map_sp, ., by.x = "Municipio", by.y = "municipio")
     
     labels <- sprintf(
       "<strong>%s</strong><br/>%.0f%% con dosis completa",
       map_obj@data$Municipio, map_obj@data$rate
     ) %>% lapply(htmltools::HTML)
     
-    map_obj %>%
-    leaflet(options = leafletOptions(maxZoom = 10)) %>%
+    
+    leaflet(data=map_obj) %>%
     # setView(-66.25789, 18.22132, 8.1) %>%
     fitBounds(lng1=-67.27135, lat1=17.92687,
                  lng2=-65.24442, lat2=18.51576,
@@ -438,6 +440,8 @@ server <- function(input, output, session) {
     # addTiles(providers$CartoDB.Positron) %>%
     
     addPolygons(
+      # lng = ~lng,
+      # lat = ~lat,
       fillColor = ~pal(rate),
       weight = 1,
       opacity = 1,
@@ -455,7 +459,11 @@ server <- function(input, output, session) {
         style = list("font-weight" = "normal", padding = "3px 8px"),
         textsize = "15px",
         direction = "auto")) %>%
-      addLegendNumeric(pal = pal, values = map_obj@data$rate,
+      addLabelOnlyMarkers(data=map_centers, lng = ~X, lat = ~Y, label = ~municipio,
+                          labelOptions = labelOptions(
+                            noHide = TRUE, direction = 'center',
+                            textOnly = TRUE, textsize="7px")) %>%
+      addLegendNumeric(pal = pal, values = map_obj$rate,
                 title = "Población con dosis completa", bins=7,
                 position = "bottomright", orientation='horizontal',
                 numberFormat = function(x) {make_pct(x/100,0)},
