@@ -116,6 +116,7 @@ ui <- fluidPage(
                          mainPanel(
                            plotOutput("mapa"),
                            leafletOutput("mapa_leaflet"),
+                           leafletOutput("mapa_leaflet_quantiles"),
                            DT::dataTableOutput("municipio_tabla")
                          )
                        )),
@@ -489,17 +490,108 @@ server <- function(input, output, session) {
                 },
                 height=20, width=150)
     
-      # + 
-      # geom_polygon(aes(x = X, y = Y, group = paste(municipio, part), fill = rate), color = "black", size = 0.15) + 
-      # geom_text(mapping = aes(x = X, y = Y, label = municipio), data = map_centers,
-      #           size  = 2.0,
-      #           color = "black") +
-      # scale_fill_gradientn(colors = rev(RColorBrewer::brewer.pal(9, "Reds")),
-      #                      name = "Por ciento con dosis completa:",
-      #                      limits= c(100*min_rate, 100*max_rate)) +
-      # coord_map() +
-      # theme_void() +
-      # theme(legend.position = "bottom")
+  })
+  
+  output$mapa_leaflet_quantiles <- renderLeaflet({
+    load(file.path(rda_path, "piramide.rda"))
+    load(file.path(rda_path, "map.rda"))
+    tab <- piramide_tab %>%
+      filter(!municipio %in% c("Todos", "No reportados"))
+    
+    if(input$municipio_agerange != "all"){
+      tab <- tab %>% filter(ageRange == input$municipio_agerange)
+    } 
+    
+    
+    
+    map_obj <- tab %>%  group_by(municipio) %>%
+      summarize(onedose = sum(onedose),
+                full = sum(full),
+                lost = sum(lost),
+                immune = sum(immune),
+                poblacion = sum(poblacion), .groups = "drop") %>%
+      mutate(rate = full/ poblacion) %>%
+      mutate(rate = 100*rate) %>%
+      # mutate(rate = 100*pmin(pmax(rate, min_rate), max_rate)) %>%
+      na.omit() %>%
+      # left_join(map, by = "municipio") %>%
+      # rename(lng = X, lat = Y) %>%
+      # as.data.frame()
+      # data_obj %>%
+      sp::merge(map_sp, ., by.x = "Municipio", by.y = "municipio")
+    
+    # min_rate <- .60
+    # max_rate <- .80
+    
+    # min_data_rate <- min(map_obj@data$rate)
+    # max_data_rate <- max(map_obj@data$rate)
+    
+    sorted_by_rate <- map_obj@data[order(map_obj@data$rate),]
+    # ggplot(sorted_by_rate, aes(1:length(rate), rate)) +
+    #   geom_point()
+    
+    nBins <- 3
+    bins <- quantile(sorted_by_rate$rate, probs=seq(0,1, 1.0/nBins)) %>% round() %>% unname()
+    pal <- colorBin(rev(RColorBrewer::brewer.pal(nBins, "Reds")), domain = sorted_by_rate$rate, bins = bins)
+    # min_rate <- sorted_by_rate[5,"rate"] / 100
+    # max_rate <- sorted_by_rate[78-10, "rate"] / 100
+    
+    # pal <- colorNumeric(palette=rev(RColorBrewer::brewer.pal(9, "Reds")),
+    #                     domain=c(100*min_rate, 100*max_rate))
+    # pal <- colorNumeric(palette=rev(RColorBrewer::brewer.pal(9, "Reds")), 
+    #                     domain=c(min_data_rate, max_data_rate))
+    
+    labels <- sprintf(
+      "<strong>%s</strong><br/>%.0f%% con dosis completa",
+      map_obj@data$Municipio, map_obj@data$rate
+    ) %>% lapply(htmltools::HTML)
+    
+    
+    
+    
+    leaflet(data=map_obj) %>%
+      # setView(-66.25789, 18.22132, 8.1) %>%
+      fitBounds(lng1=-67.27135, lat1=17.92687,
+                lng2=-65.24442, lat2=18.51576,
+                options = list(padding = c(0,0))) %>%
+      # addTiles(providers$CartoDB.Positron) %>%
+      
+      addPolygons(
+        # lng = ~lng,
+        # lat = ~lat,
+        fillColor = ~pal(rate),
+        weight = 1,
+        opacity = 1,
+        color = "black",
+        dashArray = "",
+        fillOpacity = 1.0,
+        highlightOptions = highlightOptions(
+          weight = 5,
+          color = "#666",
+          dashArray = "",
+          fillOpacity = 1.0,
+          bringToFront = TRUE),
+        label = labels,
+        labelOptions = labelOptions(
+          style = list("font-weight" = "normal", padding = "3px 8px"),
+          textsize = "15px",
+          direction = "auto")) %>%
+      addLabelOnlyMarkers(data=map_centers, lng = ~X, lat = ~Y, label = ~municipio,
+                          labelOptions = labelOptions(
+                            noHide = TRUE, direction = 'center',
+                            textOnly = TRUE, textsize="7px")) %>%
+      addLegend(pal = pal, values = ~rate, opacity = 1.0, title = "Población con dosis completa",
+                    position = "bottomright", labFormat = labelFormat(suffix='%'))
+      # addLegendNumeric(pal = pal, values = c(min_rate*100,max_rate*100),
+      #                  title = "Población con dosis completa", bins=3.0,
+      #                  position = "bottomright", orientation='horizontal',
+      #                  numberFormat = function(x) {
+      #                    paste(
+      #                      ifelse(x == 100*min_rate,"<",">"),
+      #                      make_pct(x/100,0))
+      #                  },
+      #                  height=20, width=150)
+    
   })
   
   
