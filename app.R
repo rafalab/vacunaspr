@@ -401,15 +401,11 @@ server <- function(input, output, session) {
     tab <- piramide_tab %>%
       filter(!municipio %in% c("Todos", "No reportados"))
     
-    min_rate <- .40
-    max_rate <- .70
-    
     if(input$municipio_agerange != "all"){
       tab <- tab %>% filter(ageRange == input$municipio_agerange)
     } 
     
-    pal <- colorNumeric(palette=rev(RColorBrewer::brewer.pal(9, "Reds")), 
-                        domain=c(100*min_rate, 100*max_rate))
+    
     
     map_obj <- tab %>%  group_by(municipio) %>%
       summarize(onedose = sum(onedose),
@@ -418,7 +414,8 @@ server <- function(input, output, session) {
                 immune = sum(immune),
                 poblacion = sum(poblacion), .groups = "drop") %>%
       mutate(rate = full/ poblacion) %>%
-      mutate(rate = 100*pmin(pmax(rate, min_rate), max_rate)) %>%
+      mutate(rate = 100*rate) %>%
+      # mutate(rate = 100*pmin(pmax(rate, min_rate), max_rate)) %>%
       na.omit() %>%
       # left_join(map, by = "municipio") %>%
       # rename(lng = X, lat = Y) %>%
@@ -426,10 +423,29 @@ server <- function(input, output, session) {
     # data_obj %>%
     sp::merge(map_sp, ., by.x = "Municipio", by.y = "municipio")
     
+    # min_rate <- .60
+    # max_rate <- .80
+    
+    # min_data_rate <- min(map_obj@data$rate)
+    # max_data_rate <- max(map_obj@data$rate)
+    
+    sorted_by_rate <- map_obj@data[order(map_obj@data$rate),]
+    # ggplot(sorted_by_rate, aes(1:length(rate), rate)) +
+    #   geom_point()
+    min_rate <- sorted_by_rate[5,"rate"] / 100
+    max_rate <- sorted_by_rate[78-10, "rate"] / 100
+    
+    pal <- colorNumeric(palette=rev(RColorBrewer::brewer.pal(9, "Reds")),
+                        domain=c(100*min_rate, 100*max_rate))
+    # pal <- colorNumeric(palette=rev(RColorBrewer::brewer.pal(9, "Reds")), 
+    #                     domain=c(min_data_rate, max_data_rate))
+    
     labels <- sprintf(
       "<strong>%s</strong><br/>%.0f%% con dosis completa",
       map_obj@data$Municipio, map_obj@data$rate
     ) %>% lapply(htmltools::HTML)
+    
+    
     
     
     leaflet(data=map_obj) %>%
@@ -442,7 +458,7 @@ server <- function(input, output, session) {
     addPolygons(
       # lng = ~lng,
       # lat = ~lat,
-      fillColor = ~pal(rate),
+      fillColor = ~pal(pmin(pmax(rate, 100*min_rate), 100*max_rate)),
       weight = 1,
       opacity = 1,
       color = "black",
@@ -463,10 +479,14 @@ server <- function(input, output, session) {
                           labelOptions = labelOptions(
                             noHide = TRUE, direction = 'center',
                             textOnly = TRUE, textsize="7px")) %>%
-      addLegendNumeric(pal = pal, values = map_obj$rate,
-                title = "Población con dosis completa", bins=7,
+      addLegendNumeric(pal = pal, values = c(min_rate*100,max_rate*100),
+                title = "Población con dosis completa", bins=3.0,
                 position = "bottomright", orientation='horizontal',
-                numberFormat = function(x) {make_pct(x/100,0)},
+                numberFormat = function(x) {
+                  paste(
+                    ifelse(x == 100*min_rate,"<",">"),
+                    make_pct(x/100,0))
+                },
                 height=20, width=150)
     
       # + 
