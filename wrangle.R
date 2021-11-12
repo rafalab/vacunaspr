@@ -451,14 +451,6 @@ proveedores <- bind_rows(
             rezago_esta_semana = mean(diff[insert_date >= today() - weeks(1)]),
             .groups = "drop")
 
-## Total - daily vaccine counts 
-
-total_daily_vax_counts <- daily_vax_counts %>% 
-  mutate(immunized = full - lost) %>%
-  pivot_longer(cols = c("onedose", "full", "booster", "lost", "immunized"),
-               names_to = "status_type", values_to = "daily") %>%
-  as.data.table()
-total_daily_vax_counts[, total := cumsum(daily), keyby = .( ageRange, manu, gender, status_type)]
 
 
 save(proveedores, file=file.path(rda_path ,"proveedores.rda"))
@@ -470,5 +462,4 @@ save(daily_vax_counts_by_municipio, file = file.path(rda_path, "daily_vax_counts
 save(dat_cases, file =  file.path(rda_path ,"dat_cases.rda"))
 save(immune, file = file.path(rda_path ,"immune.rda"))
 save(piramide, piramide_tab, file = file.path(rda_path, "piramide.rda"))
-save(total_daily_vax_counts, file=file.path(rda_path, "total_daily_vax_counts.rda"))
 
