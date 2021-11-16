@@ -81,7 +81,14 @@ ui <- fluidPage(
                                                   `Moderna` = "MOD", 
                                                   `J&J` = "JSN"),
                                        selected = "all"), 
-                           dateRangeInput("graficas_range", "Periodo", 
+                           selectInput("graficas_agerange",
+                                       "Grupo de Edad",
+                                       choice = c("Agregados" = "all",
+                                                  "Todos" = "facet",
+                                                  rev(age_levels[-1])),
+                                       selected = "all"),
+                           dateRangeInput("graficas_range", 
+                                          "Periodo", 
                                           start = last_day - days(240),
                                           end = last_day,
                                           format = "M-dd-yyyy",
@@ -89,12 +96,6 @@ ui <- fluidPage(
                                           width = "100%",
                                           min = first_day,
                                           max = last_day),
-                           selectInput("graficas_agerange",
-                                       "Grupo de Edad",
-                                       choice = c("Agregados" = "all",
-                                                  "Todos" = "facet",
-                                                  rev(age_levels[-1])),
-                                       selected = "all"),
                            selectInput("graficas_tasa",
                                        "Tasa o total",
                                        choice = c("Tasa" = "tasa",
@@ -522,8 +523,8 @@ server <- function(input, output, session) {
         legend_pstn = "none"
         show_legend <- FALSE
       } else {
-        labels_manu <- c(manu_labels[[input$manu_type]])
-        values_manu <- c(manu_colors[[input$manu_type]])
+        labels_manu <- c(manu_labels[[input$graficas_manu]])
+        values_manu <- c(manu_colors[[input$graficas_manu]])
         fill_name = "Vacunas:"
         legend_pstn = "bottom"
       }
@@ -575,13 +576,22 @@ server <- function(input, output, session) {
         ungroup()
     }
     
+    if (input$graficas_agerange =="12-17") {
     daily_vax_counts <- daily_vax_counts %>%
-      filter(date >= input$graficas_range[1] & date <= input$graficas_range[2]) 
-    
+      filter(date >=  ifelse(input$graficas_range[1]< make_date(2021,05,12), make_date(2021,05,12), input$graficas_range[1])  & date <= input$graficas_range[2]) 
+    } else if (input$graficas_agerange =="5-11"){
+        daily_vax_counts <- daily_vax_counts %>%
+          filter(date >= ifelse(input$graficas_range[1]< make_date(2021,11,04), make_date(2021,11,04), input$graficas_range[1]) & date <= input$graficas_range[2]) 
+      }
+     else {
+      daily_vax_counts <- daily_vax_counts %>%
+        filter(date >= input$graficas_range[1] & date <= input$graficas_range[2]) 
+    }
+      
     
     p <- daily_vax_counts %>%
       mutate(outcome = !!sym(input$graficas_dose)) %>%
-      ggplot(aes(x=date, y=outcome, fill=manu,)) + 
+      ggplot(aes(x=date, y=outcome, fill=manu)) + 
       geom_col(position = "dodge", show.legend = show_legend, color = NA) +  
       xlab("Fecha") +
       scale_fill_manual(
@@ -603,7 +613,7 @@ server <- function(input, output, session) {
         ylab("Por ciento de la población") 
     }else{
       p <- p + scale_y_continuous(labels = scales::comma) + 
-        ylab("Número de individuas") 
+        ylab("Número de individuos") 
     } 
     p    
   })
