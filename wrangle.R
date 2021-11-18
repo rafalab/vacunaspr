@@ -7,7 +7,7 @@ library(scales)
 if(Sys.info()["nodename"] == "fermat.dfci.harvard.edu"){
   rda_path <- "/homes10/rafa/dashboard/vacunaspr/rdas"
 } else{
-  rda_path <- "rdas"
+  rda_path <- "~/R/vacunaspr/rdas"
 }
 
 manu_levels <- c("UNV", "MOD", "PFR", "JSN")
@@ -387,22 +387,36 @@ the_immune_prop <- the_immune/pr_pop
 booster <- sum(!is.na(dat_vax$booster_date))
 booster_prop <- booster/pr_pop
 
+pediatric_primera <- sum((daily_vax_counts %>% filter(ageRange=="5-11", date >=make_date(2021,11,04)))$onedose, na.rm=T)
+pediatric_primera_prop <- pediatric_primera/sum((pop_by_age_gender %>% filter(ageRange=="5-11"))$poblacion)
+
+pediatric_completa <- sum((daily_vax_counts %>% filter(ageRange=="5-11", date >=make_date(2021,11,04)))$complete, na.rm=T)
+pediatric_completa_prop <- pediatric_completa/sum((pop_by_age_gender %>% filter(ageRange=="5-11"))$poblacion)
+
+lost <-  sum(daily_vax_counts$lost)
+lost_prop <-lost/pr_pop
+
 tasas <- daily_vax_counts %>% 
   filter(date %in% span_range) %>%
   summarize(onedose = sum(onedose)/length(span_range) * 7, 
+            onedose_ped = sum((daily_vax_counts %>% filter(ageRange=="5-11", date >=make_date(2021,11,04)))$onedose, na.rm=T)/length(span_range) * 7, 
             full = sum(full)/length(span_range)* 7 , 
+            full_ped = sum((daily_vax_counts %>% filter(ageRange=="5-11", date >=make_date(2021,11,04)))$complete, na.rm=T)/length(span_range) * 7,
             immune = (sum(full) - sum(lost))/length(span_range)*7,
-            booster = sum(booster)/length(span_range)  * 7)
+            booster = sum(booster)/length(span_range)  * 7, 
+            lost = sum(lost)/length(span_range)*7)
              
 summary_tab <- data.frame(names = c("Vacunas administradas",
                             "Personas con por lo menos 1 dosis",
                             "Personas con dosis completa",
                             "Personas con dosis completa sin necesidad de booster",
-                            "Personas con boosters"),
-                  total = c(administradas, primera, completa, the_immune, booster),
-                  porciento = c(NA, primera_prop, completa_prop, the_immune_prop, booster_prop),
-                  tasas = tasas <- c(administradas_tasa, tasas$onedose, tasas$full, tasas$immune, tasas$booster))
-
+                            "Personas con boosters",
+                            "Personas con dosis completa con necesidad de booster",
+                            "Menores (5-11 años) con por lo menos 1 dosis",
+                            "Menores (5-11 años) con dosis completa"),
+                  total = c(administradas, primera, completa,  the_immune, booster, lost,  pediatric_primera, pediatric_completa),
+                  porciento = c(NA, primera_prop,  completa_prop,  the_immune_prop, booster_prop, lost_prop,  pediatric_prop, pediatric_completa_prop),
+                  tasas = tasas <- c(administradas_tasa, tasas$onedose,  tasas$full, tasas$immune, tasas$booster, tasas$lost, tasas$onedose_ped, tasas$full_ped))
 
 outcome_tab <- counts %>% group_by(status, manu) %>%
   summarize(n = sum(n, na.rm = TRUE)/365,

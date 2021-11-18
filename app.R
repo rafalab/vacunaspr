@@ -308,7 +308,7 @@ server <- function(input, output, session) {
 
 
     make_datatable(ret, 
-                   col.names = c("Fecha", "Grupo de edada", "Sexo", "Vacunación", 
+                   col.names = c("Fecha", "Grupo de edad", "Sexo", "Vacunación", 
                                  "Tipo de vacuna", "Días desde completar dosis", 
                                  "Booster"),
                    align = c("r", "c", "c", "c", "c", "r", "r"),
@@ -354,7 +354,7 @@ server <- function(input, output, session) {
              booster = make_col(booster, poblacion),
              poblacion = make_pretty(round(poblacion))) %>%
       select(ageRange, gender, poblacion, onedose, full, immune, booster) %>%
-      kbl(col.names = c("Grupo de Edad", "Sexo", "Población", "Una dosis", "Dosis completa", "Dosis complete sin necesidad de Booster", "Con booster"),
+      kbl(col.names = c("Grupo de Edad", "Sexo", "Población", "Una dosis", "Dosis completa", "Dosis completa sin necesidad de Booster", "Con booster"),
                       align = c("c","c", rep("r", 9)))  %>%
       kable_styling()
   })
