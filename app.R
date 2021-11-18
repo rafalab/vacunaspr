@@ -20,7 +20,7 @@ ui <- fluidPage(
   tags$head(includeHTML(("google-analytics.html"))),
   
   # Application title
-  titlePanel("Informe de vacunas COVID-19 en Puerto Rico (en construcción)"),
+  titlePanel("Informe de vacunas COVID-19 en Puerto Rico"),
   
   tabsetPanel(id = "tabs", 
               tabPanel("Resumen",
@@ -347,14 +347,17 @@ server <- function(input, output, session) {
     
     make_col <- function(x,n) paste0(make_pretty(x), " (", make_pct(x/n,0), ")")
     piramide_tab  %>% 
+      filter(ageRange != "0-4") %>%      
       filter(municipio == input$piramide_municipio) %>%
-      mutate(onedose = make_col(onedose, poblacion),
+      mutate(faltan = make_pretty(round(poblacion - full)),
+             onedose = make_col(onedose, poblacion),
              full = make_col(full, poblacion),
              immune = make_col(immune, poblacion),
              booster = make_col(booster, poblacion),
              poblacion = make_pretty(round(poblacion))) %>%
-      select(ageRange, gender, poblacion, onedose, full, immune, booster) %>%
-      kbl(col.names = c("Grupo de Edad", "Sexo", "Población", "Una dosis", "Dosis completa", "Dosis completa sin necesidad de Booster", "Con booster"),
+      select(ageRange, gender, poblacion, onedose, full, faltan, immune, booster) %>%
+      kbl(col.names = c("Grupo de Edad", "Sexo", "Población", "Una dosis", "Dosis completa", "Faltan", 
+                        "Dosis completa sin necesidad de Booster", "Con booster"),
                       align = c("c","c", rep("r", 9)))  %>%
       kable_styling()
   })
