@@ -347,9 +347,8 @@ server <- function(input, output, session) {
     
     make_col <- function(x,n) paste0(make_pretty(x), " (", make_pct(x/n,0), ")")
     piramide_tab  %>% 
-      filter(ageRange != "0-4") %>%      
       filter(municipio == input$piramide_municipio) %>%
-      mutate(faltan = make_pretty(round(poblacion - full)),
+      mutate(faltan = make_pretty(round(pmax(0, poblacion - full))),
              onedose = make_col(onedose, poblacion),
              full = make_col(full, poblacion),
              immune = make_col(immune, poblacion),
@@ -419,7 +418,9 @@ server <- function(input, output, session) {
                 immune = sum(immune),
                 poblacion = sum(poblacion), .groups = "drop") %>%
       arrange(full/poblacion) %>% 
-      mutate(oonedose = onedose/poblacion,
+      mutate(ofaltan = poblacion - full,
+             faltan = make_pretty(round(pmax(0, poblacion - full))),
+             oonedose = onedose/poblacion,
              onedose = make_col(onedose, poblacion),
              ofull = full/poblacion,
              full = make_col(full, poblacion),
@@ -429,18 +430,19 @@ server <- function(input, output, session) {
              booster = make_col(booster, poblacion),
              opoblacion = poblacion,
              poblacion = make_pretty(round(poblacion))) %>%
-      select(municipio, poblacion, onedose, full, immune, booster,
-             opoblacion, oonedose, ofull, oimmune, obooster) %>%
-      setNames(c("Municipio", "Población", "Una dosis", "Dosis completa", "Dosis complete sin necesidad de Booster", "Con booster",
-                 "opoblacion", "oonedose", "ofull", "oimmune", "obooster"))%>%
+      select(municipio, poblacion, onedose, full, faltan, immune, booster,
+             opoblacion, oonedose, ofull, ofaltan, oimmune, obooster) %>%
+      setNames(c("Municipio", "Población", "Una dosis", "Dosis completa", "Faltan", "Dosis complete sin necesidad de Booster", "Con booster",
+                 "opoblacion", "oonedose", "ofull", "ofaltan", "oimmune", "obooster"))%>%
       DT::datatable(rownames = FALSE,
                     options = list(dom = 't', pageLength = -1,
-                                   columnDefs = list(list(targets = 1, orderData = 6),
-                                                     list(targets = 2, orderData = 7),
-                                                     list(targets = 3, orderData = 8),
-                                                     list(targets = 4, orderData = 9),
-                                                     list(targets = 5, orderData = 10),
-                                                     list(targets = 6:10, visible = FALSE),
+                                   columnDefs = list(list(targets = 1, orderData = 7),
+                                                     list(targets = 2, orderData = 8),
+                                                     list(targets = 3, orderData = 9),
+                                                     list(targets = 4, orderData = 10),
+                                                     list(targets = 5, orderData = 11),
+                                                     list(targets = 6, orderData = 12),
+                                                     list(targets = 7:12, visible = FALSE),
                                                      list(className = 'dt-left', targets = 0),
                                                      list(className = 'dt-right', targets = 1:5)))) %>%
       DT::formatStyle(1, "white-space" = "nowrap")
