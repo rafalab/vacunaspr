@@ -278,7 +278,9 @@ fix_municipio <- function(x, min.dist = 2,
 simplify_proveedor <- function(x, col_name = "proveedor") {
   x %>%
     mutate("{col_name}" := case_when(str_detect(proveedor, "WALGREENS") ~ "Walgreens",
-                                     str_detect(proveedor, "WALMART|SAM'S") ~ "Walmart/Sams",
+                                     str_detect(proveedor, "WALMART|SAM'S|AMIGO") ~ "Walmart/Sams/Amigo",
+                                     str_detect(proveedor, "COSTCO ") ~ "Costco",
+                                     str_detect(proveedor, "VETERANS|VETERANOS") ~ "Veteranos",
                                      str_detect(proveedor, "CVS") ~ "CVS",
                                      str_detect(proveedor, "VOCES") ~ "Voces",
                                      str_detect(proveedor, "PONCE HEALTH SCIENCE UNIV|PONCE HLTH SCI UNIV HUB") ~ "Ponce Health",
@@ -286,13 +288,15 @@ simplify_proveedor <- function(x, col_name = "proveedor") {
                                      str_detect(proveedor, "CDVA") ~ "CDVA",           
                                      str_detect(proveedor, "COLEGIO MEDICOS CIRUJANOS") ~ "Colegio de Médicos", #Victor y su pandilla",
                                      str_detect(proveedor, "DESARROLLO SALUDN") ~ "Desarrollo de la Salud",
-                                     str_detect(proveedor, "AUXILIO MUTUO") ~ "Auxilio Mutuo",
-                                     str_detect(proveedor, "CORRECCIONAL") ~ "Correccional",
-                                     str_detect(proveedor, "FARMACIA|FARMACIAS|PHARMACY") ~ "Otras farmacias",
-                                     str_detect(proveedor, "HOSP|HOSPTIAL") ~ "Otros",
+                                     str_detect(proveedor, "CORREC.*CIONAL|CORRECTIONAL|CARCEL") ~ "Correccional",
+                                     str_detect(proveedor, "FARM.*|PHARM.*") ~ "Otras farmacias",
+                                     str_detect(proveedor, "HOS|HOSP|HOSPTIAL|HIMA") ~ "Hospitales",
+                                     str_detect(proveedor, "MED.* CENTER") ~ "Hospitales",
                                      str_detect(proveedor, "MEDICAL SCIENCE CAMPUS UPR") ~ "Ciencias Médicas", 
-                                     str_detect(proveedor, "UNIVERSIDAD|UPR|UNIV|COLEGIO") ~ "Otras Universidades",
+                                     str_detect(proveedor, "UNIVERSIDAD|UPR|UNIV|COLEGIO|COLLEGE|SECUNDA.*|SCHOOL|ACADEM|COL|ESC|RECINTO|CCD") ~ "Otras Universidades/Escuelas/Cuidos",
                                      str_detect(proveedor, "CDT") ~ "CDTs",
-                                     str_detect(proveedor, "DR ") ~ "Doctores",
-                                     TRUE ~ "Otros"))
-}
+                                     str_detect(proveedor, "DR|DRA|GRUPO|OFIC.*INA.*|.*CLINIC.*|CLINC") ~ "Doctores",
+                                     str_detect(proveedor, ".*CENTRO.*|.*CENTER.*|.*CNTR|CTR|PRYMED|SALUS|CERVAC|QCDC|GROUP|INST|WIC|SERV|INC|MALL|LLC|CORP|COSSMA|PROMED|FMC|FRESENIUS") ~ "Centros de Salud",
+                                     TRUE ~ "Otros")) }
+  
+  
