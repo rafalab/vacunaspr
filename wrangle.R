@@ -415,7 +415,7 @@ summary_tab <- data.frame(names = c("Vacunas administradas",
                             "Menores (5-11 años) con por lo menos 1 dosis",
                             "Menores (5-11 años) con dosis completa"),
                   total = c(administradas, primera, completa,  the_immune, booster, lost,  pediatric_primera, pediatric_completa),
-                  porciento = c(NA, primera_prop,  completa_prop,  the_immune_prop, booster_prop, lost_prop,  pediatric_prop, pediatric_completa_prop),
+                  porciento = c(NA, primera_prop,  completa_prop,  the_immune_prop, booster_prop, lost_prop,  pediatric_primera_prop, pediatric_completa_prop),
                   tasas = tasas <- c(administradas_tasa, tasas$onedose,  tasas$full, tasas$immune, tasas$booster, tasas$lost, tasas$onedose_ped, tasas$full_ped))
 
 outcome_tab <- counts %>% group_by(status, manu) %>%
