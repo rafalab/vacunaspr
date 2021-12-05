@@ -102,7 +102,7 @@ counts_partial_age_gender_manu <- counts_partial_age_gender_manu[, !c("n.y", "n.
 
 ## Boosters
 daily_counts_booster_age_gender_manu <- dat_vax[!is.na(booster_date), .(booster = .N),
-                                            keyby = .(booster_date, ageRange_3, gender, manu_3)]
+                                                keyby = .(booster_date, booster_ageRange, gender, booster_manu)]
 names(daily_counts_booster_age_gender_manu) <- c("date", "ageRange", "gender", "manu", "booster")
 daily_counts_booster_age_gender_manu <- merge(all_combs, daily_counts_booster_age_gender_manu, all.x=TRUE)
 daily_counts_booster_age_gender_manu[is.na(daily_counts_booster_age_gender_manu)] <- 0 
