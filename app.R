@@ -215,7 +215,7 @@ server <- function(input, output, session) {
     load(file.path(rda_path, "tabs.rda"))
   
     outcome_tab %>% 
-      mutate(status = recode(status, UNV = "No vacunados", PAR= "Parcial", VAX="Vacunados")) %>%
+      mutate(status = recode(status, UNV = "No vacunados", PAR= "Parcial", VAX="Vacunados sin booster", BST = "Vacunados con booster")) %>%
       mutate(manu = recode(as.character(manu), UNV = "", MOD = "Moderna", 
                            PFR = "Pfizer", JSN = "J & J")) %>%
       mutate(n = make_pretty(round(n)),
@@ -251,17 +251,19 @@ server <- function(input, output, session) {
      
      p <- counts %>% 
        filter(date >= input$event_range[1] & date <= input$event_range[2]) %>%
-       filter(status %in% c("VAX", "UNV")) %>%
+       filter(status %in% c("VAX", "UNV", "BST")) %>%
+       filter(!(status == "BST" & manu == "JSN")) %>%
        mutate(outcome = !!sym(input$event_type)) %>%
-       group_by(date, manu, ageRange) %>%
+       group_by(date, status, manu, ageRange) %>%
        summarize(outcome = sum(outcome), n=sum(n, na.rm=TRUE), .groups = "drop") %>%
-       group_by(manu, ageRange) %>% 
+       group_by(status, manu, ageRange) %>% 
        mutate(denom =  ma7(date, n, k = 14)$moving_avg) %>%
        mutate(rate = ma7(date, outcome, k = 14)$moving_avg/denom * 10^5) %>%
        ungroup() %>%
-       filter(denom > 25) %>%
-       ggplot(aes(date, rate, color = manu)) +
-       geom_line(lwd = 1.5, alpha = 0.7) +
+       filter(denom > 10000) %>%
+       mutate(Booster = factor(ifelse(status != "BST",  "Sin", "Con"), levels = c("Sin", "Con"))) %>%
+       ggplot(aes(date, rate, color = manu, lty = Booster)) +
+       geom_line(lwd = 1.25, alpha = 0.7) +
        labs(y="Tasa por día por 100,000", x="Fecha", title = the_title, 
             caption = "Basado en media móvil de 14 días")+
        scale_color_manual(
@@ -272,6 +274,7 @@ server <- function(input, output, session) {
        theme_bw()+
        theme(legend.position = "bottom", text = element_text(size = 15))
      
+     p
      if(input$event_agerange == "facet") p <- p + facet_wrap(~ageRange)
      
      return(p)
@@ -296,11 +299,11 @@ server <- function(input, output, session) {
       slice(1:1000) %>%
       mutate(days = pmax(0, ifelse(manu=="JSN", as.numeric(date-date_1), as.numeric(date - date_2)))) %>%
       mutate(days = na_if(days, 0)) %>%
-      mutate(booster = case_when(booster ~ "Sí",
+      mutate(booster = case_when(status == "BST" ~ "Sí",
                                  status == "VAX" ~ "No",
                                  TRUE ~ "")) %>%
       select(date, ageRange, gender, status, manu, days, booster) %>%
-      mutate(status = as.character(recode(status, UNV = "No vacunado", PAR= "Parcial", VAX="Vacunado"))) %>%
+      mutate(status = as.character(recode(status, UNV = "No vacunado", PAR= "Parcial", VAX="Vacunado", BST = "Vacunado"))) %>%
       mutate(status = ifelse(gender == "F" & status == "Vacunado", "Vacunada", status)) %>%
       mutate(status = ifelse(gender == "F" & status == "No vacunado", "No vacunada", status)) %>%
       mutate(manu = recode(as.character(manu), UNV = "", MOD = "Moderna", PFR = "Pfizer", JSN = "J & J"))
@@ -484,7 +487,7 @@ server <- function(input, output, session) {
              death_rate = ma7(date, death)$moving_avg/ma7(date, n)$moving_avg * 10^5) %>%
       ungroup() %>%
       arrange(desc(date), status, manu) %>%
-      mutate(status = recode(status, UNV = "No vacunados", PAR= "Parcial", VAX="Vacunados")) %>%
+      mutate(status = recode(status, UNV = "No vacunados", PAR= "Parcial", VAX="Vacunados sin booster", BST = "Vacunado con booster")) %>%
       mutate(manu = recode(as.character(manu), UNV = "", MOD = "Moderna", PFR = "Pfizer", JSN = "J & J")) %>%
       mutate(n = make_pretty(round(n)),
              cases_rate = digits(cases_rate),
