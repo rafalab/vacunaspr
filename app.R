@@ -52,6 +52,10 @@ ui <- fluidPage(
                                                   "Todos" = "facet",
                                                   rev(age_levels[-1])),
                                        selected = "all"),
+                           selectInput("event_scale",
+                                       "Escala",choice = c("Lineal" = "linear",
+                                                           "Logarítimica" = "log"),
+                                       selected = "linear"),
                            width = 3),
                          mainPanel(
                             plotOutput("muertes_plot"),
@@ -274,8 +278,8 @@ server <- function(input, output, session) {
        theme_bw()+
        theme(legend.position = "bottom", text = element_text(size = 15))
      
-     p
      if(input$event_agerange == "facet") p <- p + facet_wrap(~ageRange)
+     if(input$event_scale == "log") p <- p + scale_y_continuous(trans = "log2")
      
      return(p)
 
