@@ -182,7 +182,7 @@ ui <- fluidPage(
                            DT::dataTableOutput("tabla")
                          )
                        )),
-                       tabPanel("Detalles importantes",
+                       tabPanel("FAQ",
                                 htmlOutput("importantInfo")
                        )
             ),
@@ -255,30 +255,34 @@ server <- function(input, output, session) {
      
      if(input$event_agerange == "all") counts$ageRange <- "all" 
      
+     the_k <- case_when(input$event_type == "death" ~ 60,
+                        input$event_type == "hosp" ~ 30,
+                        input$event_type == "cases" ~ 14)
      p <- counts %>% 
-       filter(date >= input$event_range[1] & date <= input$event_range[2]) %>%
        filter(status %in% c("VAX", "UNV", "BST")) %>%
        filter(!(status == "BST" & manu == "JSN")) %>%
        mutate(outcome = !!sym(input$event_type)) %>%
        group_by(date, status, manu, ageRange) %>%
        summarize(outcome = sum(outcome), n=sum(n, na.rm=TRUE), .groups = "drop") %>%
        group_by(status, manu, ageRange) %>% 
-       mutate(denom =  ma7(date, n, k = 14)$moving_avg) %>%
-       mutate(rate = ma7(date, outcome, k = 14)$moving_avg/denom * 10^5) %>%
+       mutate(denom =  ma7(date, n, k = the_k)$moving_avg) %>%
+       mutate(rate = ma7(date, outcome, k = the_k)$moving_avg/denom * 10^5) %>%
        ungroup() %>%
+       filter(date >= input$event_range[1] & date <= input$event_range[2]) %>%
        filter(denom > 10000) %>%
        mutate(Booster = factor(ifelse(status != "BST",  "Sin", "Con"), levels = c("Sin", "Con"))) %>%
        ggplot(aes(date, rate, color = manu, lty = Booster)) +
        geom_line(lwd = 1.25, alpha = 0.7) +
        labs(y="Tasa por día por 100,000", x="Fecha", title = the_title, 
-            caption = "Basado en media móvil de 14 días")+
+            caption = paste("Basado en media móvil de", the_k,"días")) +
        scale_color_manual(
          labels = c(manu_labels[["UNV"]], manu_labels[["MOD"]], manu_labels[["PFR"]],
                     manu_labels[["JSN"]]),
          values = c(manu_colors[["UNV"]], manu_colors[["MOD"]], manu_colors[["PFR"]],
                     manu_colors[["JSN"]]), name="Vacuna:") +
        theme_bw()+
-       theme(legend.position = "bottom", text = element_text(size = 15))
+       theme(legend.position = "bottom", text = element_text(size = 15)) +
+       scale_x_date(date_labels = "%b", breaks = scales::breaks_width("1 month"))
      
      if(input$event_agerange == "facet") p <- p + facet_wrap(~ageRange)
      if(input$event_scale == "log") p <- p + scale_y_continuous(trans = "log2")
