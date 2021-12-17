@@ -181,8 +181,10 @@ ui <- fluidPage(
                          mainPanel(
                            DT::dataTableOutput("tabla")
                          )
+                       )),
+                       tabPanel("Detalles importantes",
+                                htmlOutput("importantInfo")
                        )
-              ) 
             ),
   htmlOutput("update"),
 )
@@ -629,6 +631,49 @@ server <- function(input, output, session) {
     } 
     p    
   })
+  
+  output$importantInfo <- renderText({
+    " <h3> Información importante sobre el manejo de datos en este dashboard </h3>
+  <br/> 
+
+<b> Nota: </b> Los datos presentados en este dashboard pueden cambiar según pasa el tiempo pues provienen de una base de datos viva sujeta a ediciones según nueva información se hace disponible. Además, como parte del proceso de organización y limpieza de datos, los analistas encargados de este dashboard pueden hacer modificaciones que entiendan pertinentes para mejorar la calidad de la información que aquí se presenta. 
+
+<br/> <br/>
+  
+<h4> Definiciones importantes </h4>
+<ul><li> Vacunas administradas: suma de todas las primeras dosis, segundas dosis, y dosis de refuerzo administradas en Puerto Rico. 
+<br/> 
+</li><li> Personas con por lo menos una dosis: suma de todas las personas que se han puesto al menos una dosis. Note que todas las personas con más de una dosis están contempladas en esta suma. 
+<br/> 
+</li><li> Personas con dosis completa: suma de todas las personas que se han puesto dos dosis de Pfizer o Moderna o una de Janssen y han transcurrido 14 días desde su última dosis. 
+<br/> 
+</li><li> Personas con dosis completa sin necesidad de booster: suma de personas que con dosis completa que aún no necesitan dosis de refuerzo porque no han transcurrido 6 meses desde su segunda dosis de Moderna o Pfizer o 2 meses desde su primera dosis de Janssen. 
+<br/> 
+</li><li> Personas con boosters: suma de personas que completaron sus dosis de vacunación y se administraron su dosis de refuerzo. 
+<br/> 
+</li><li> Personas con dosis completa con necesidad de booster: suma de personas que ya completaron sus dosis de vacunación pero han transcurrido 6 meses (Pfizer o Moderna) o 2 meses (Janssen) y no se han puesto su dosis de refuerzo. 
+<br/> 
+</li><li> Menores (5-11 años) con por lo menos 1 dosis: suma de personas entre 5-11 años que cuentan con al menos una dosis. 
+<br/> 
+</li><li> Menores (5-11 años) con dosis completa:  suma de personas entre 5-11 años que cuentan con sus dos dosis y han transcurrido 14 días desde su última dosis. 
+<br/> 
+</li><li> Vacunación <i>parcial</i> se refiere a aquellas personas que han iniciado su serie de vacunación pero aún no se consideran como vacunados por no haber transcurrido 14 días luego de su última dosis requerida. 
+<br/>
+</li><li> <i>Vacunados</i> son aquellas personas que han completado su serie de vacunación: han transcurrido 14 días luego de su última dosis requerida.
+<br/>
+</li><li> Las personas con booster son aquellas personas que se han puesto sus dosis de refuerzo y han transcurrido 14 días desde la dosis de refuerzo. 
+</li></ul>
+
+<h4> Sobre el cálculo de tasas </h4>
+
+Para calcular las tasas de cada evento por estado de vacunación y grupo de edad es necesario realizar un pareo entre la base de datos del BioPortal y la base de datos del PREIS. Este proceso carece de un identificador único común entre las bases, por lo que se ha desarrollado un algoritmo que realiza el pareo utilizando variables disponibles. Al momento, hemos descubierto que el algoritmo es 99% efectivo en identificar correctamente a las personas. Naturalmente, existen rezagos de entrada de datos en ambas bases, que convergen en el pareo y resulta en que las tasa de días recientes cambien mientras entran los datos. 
+  
+<h4> Estimados poblacionales </h4>
+
+Los estimados poblacionales que se usan en este dashboard provienen de un ajuste que se realiza utilizando el estimado poblacional del CENSO Decenal 2020 y los estimados poblacionales (por grupo edad, municipio y sexo) de ACS 2019. La razón para realizar el ajuste es porque se entiende que los estimados del ACS 2019 no capturan la realidad de la población puertorriqueña del 2020-2021 y se ha anunciado que el <i> U.S. Census Bureau </i> no estará publicando los estimados del ACS 2020 para Puerto Rico. Para estudiar el código de este proceso puede accesar: <a> https://github.com/rafalab/vacunaspr/blob/main/wrangle-population-data.R </a>. 
+    
+    
+    "})
 }
 
 shinyApp(ui = ui, server = server)
