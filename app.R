@@ -117,6 +117,13 @@ ui <- fluidPage(
               tabPanel("Municipios",
                        sidebarLayout(
                          sidebarPanel(
+                           selectInput("municipio_dose",
+                                       "Estado de vacunación",
+                                       choice = c(`Una dosis` = "onedose",
+                                                  `Completa` = "full",
+                                                  `Booster` = "booster", 
+                                                  `Sin necesidad de booster` = "immune"),
+                                       selected = "full"),
                            selectInput("municipio_agerange",
                                        "Grupo de Edad",
                                        choice = c("Agregados" = "all",
@@ -519,22 +526,39 @@ server <- function(input, output, session) {
     tab <- piramide_tab %>%
       filter(!municipio %in% c("Todos", "No reportados"))
     
+    title_dose <- case_when(
+      input$municipio_dose == "full" ~ "con dosis completa",
+      input$municipio_dose == "onedose" ~ "con una dosis",
+      input$municipio_dose == "booster" ~ "con dosis de refuerzo", 
+      input$municipio_dose == "immune" ~ "sin necesidad de dosis de refuerzo")
+    
+    hover_suffix <- case_when(
+      input$municipio_dose == "full" ~ "con dosis completa",
+      input$municipio_dose == "onedose" ~ "con una dosis",
+      input$municipio_dose == "booster" ~ "con dosis de refuerzo", 
+      input$municipio_dose == "immune" ~ "sin necesidad de dosis de refuerzo")
+    
+    hover_age <- ""
     if(input$municipio_agerange != "all"){
       tab <- tab %>% filter(ageRange == input$municipio_agerange)
+      hover_age <- paste0(" con ", input$municipio_agerange, " años")
     } 
     
-    
+    the_title <- paste0("Población", hover_age, " ", title_dose)
     
     map_obj <- tab %>%  group_by(municipio) %>%
       summarize(onedose = sum(onedose),
                 full = sum(full),
                 lost = sum(lost),
                 immune = sum(immune),
+                booster = sum(booster),
                 poblacion = sum(poblacion), .groups = "drop") %>%
-      mutate(rate = full/ poblacion) %>%
+      mutate(outcome = !!sym(input$municipio_dose)) %>%
+      mutate(rate = outcome/ poblacion) %>%
       mutate(rate = 100*rate) %>%
       # mutate(rate = 100*pmin(pmax(rate, min_rate), max_rate)) %>%
       na.omit() %>%
+      
       # left_join(map, by = "municipio") %>%
       # rename(lng = X, lat = Y) %>%
       # as.data.frame()
@@ -563,8 +587,8 @@ server <- function(input, output, session) {
     #                     domain=c(min_data_rate, max_data_rate))
     
     labels <- sprintf(
-      "<strong>%s</strong><br/>%.0f%% con dosis completa",
-      map_obj@data$Municipio, map_obj@data$rate
+      "<strong>%s</strong><br/>%.0f%% %s",
+      map_obj@data$Municipio, map_obj@data$rate, hover_suffix
     ) %>% lapply(htmltools::HTML)
     
     
@@ -601,7 +625,7 @@ server <- function(input, output, session) {
                           labelOptions = labelOptions(
                             noHide = TRUE, direction = 'center',
                             textOnly = TRUE, textsize="7px")) %>%
-      addLegend(pal = pal, values = ~rate, opacity = 1.0, title = "Población con dosis completa",
+      addLegend(pal = pal, values = ~rate, opacity = 1.0, title = the_title,
                     position = "bottomright", labFormat = labelFormat(suffix='%', transform=round))
       # addLegendNumeric(pal = pal, values = c(min_rate*100,max_rate*100),
       #                  title = "Población con dosis completa", bins=3.0,
