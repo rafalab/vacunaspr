@@ -11,6 +11,10 @@ if(Sys.info()["nodename"] == "fermat.dfci.harvard.edu"){
 }
 
 manu_levels <- c("UNV", "MOD", "PFR", "JSN")
+first_ped_day <- make_date(2021, 11, 04)
+first_booster_day <- make_date(2021, 8, 13)
+first_jnj_booster_day <- make_date(2021, 10, 22)
+
 load(file.path(rda_path, "dat_vax.rda"))
 load(file.path(rda_path, "population-tabs.rda"))
 
@@ -28,11 +32,12 @@ administradas_tasa <-
   filter(dat_vax, date_3 %in% span_range) %>% nrow )/length(span_range) * 7
 
 dat_vax <- dat_vax[!manu_1 %in% c("ATZ","OTR") & 
-          !manu_2 %in% c("ATZ","OTR") &
-          !manu_2 %in% c("ATZ","OTR"), ] 
+                     !manu_2 %in% c("ATZ","OTR") &
+                     !manu_3 %in% c("ATZ","OTR"), ] 
 dat_vax$manu_1 <- droplevels(dat_vax$manu_1)
 dat_vax$manu_2 <- droplevels(dat_vax$manu_2)
 dat_vax$manu_3 <- droplevels(dat_vax$manu_3)
+
 
 dat_vax[estado %in% c("PR", "No reportado") , c("vax_date", "booster_date", "booster_manu", "booster_insert_date", "booster_proveedor", "booster_ageRange") := .(date_2, date_3, manu_3, insert_date_3, proveedor_3, ageRange_3)]
 dat_vax[manu_1 == "JSN", 
@@ -41,14 +46,20 @@ dat_vax[!is.na(vax_date), vax_date := vax_date + days(14)]
 dat_vax[vax_date > today(), vax_date := NA] ## not fully vax yet
 
 ## to early to be a booster
-dat_vax[!is.na(booster_date) & manu_2 != "JSN" & booster_date < make_date(2021, 8, 13), c("booster_date", "booster_manu", "booster_insert_date", "booster_proveedor", "booster_ageRange") := .(NA, NA, NA, NA, NA)]
-dat_vax[!is.na(booster_date) & manu_2 == "JSN" & booster_date < make_date(2021, 10, 22), c("booster_date", "booster_manu", "booster_insert_date", "booster_proveedor", "booster_ageRange") := .(NA, NA, NA, NA, NA)]
+dat_vax[!is.na(booster_date) & manu_1 != "JSN" & (booster_date < first_booster_day | booster_date - date_2 < days(180)), 
+        c("booster_date", "booster_manu", "booster_insert_date", "booster_proveedor", "booster_ageRange") := .(NA, NA, NA, NA, NA)]
+dat_vax[!is.na(booster_date) & manu_1 == "JSN" & (booster_date < first_jnj_booster_day | booster_date - date_1 < days(60)), 
+        c("booster_date", "booster_manu", "booster_insert_date", "booster_proveedor", "booster_ageRange") := .(NA, NA, NA, NA, NA)]
+# not vaxed, can't be boosted
+dat_vax[!is.na(booster_date) & is.na(vax_date), 
+        c("booster_date", "booster_manu", "booster_insert_date", "booster_proveedor", "booster_ageRange") := .(NA, NA, NA, NA, NA)]
+
 
 ## last data without needing a booster
-dat_vax[is.na(booster_date) & !is.na(vax_date) & manu_2 != "JSN", last_immune_date := date_2 + months(6)]
-dat_vax[!is.na(booster_date) & manu_2 != "JSN", last_immune_date := booster_date + months(6)]
-dat_vax[is.na(booster_date) & !is.na(vax_date) & manu_2 == "JSN", last_immune_date := date_1 + months(2)]
-dat_vax[!is.na(booster_date) & manu_2 == "JSN", last_immune_date := booster_date + months(2)]
+dat_vax[is.na(booster_date) & !is.na(vax_date) & manu_2 != "JSN", last_immune_date := date_2 + days(180)]
+#dat_vax[!is.na(booster_date) & manu_3 != "JSN", last_immune_date := booster_date + days(180)]
+dat_vax[is.na(booster_date) & !is.na(vax_date) & manu_2 == "JSN", last_immune_date := date_1 + days(60)]
+#dat_vax[!is.na(booster_date) & manu_3 == "JSN", last_immune_date := booster_date + days(60)]
 
 
 all_dates <- data.table(date = seq(first_day, last_day, "days"))
@@ -71,7 +82,7 @@ all_combs_muni <- CJ(date = all_dates$date,
 
 ## Fully vaxed
 daily_counts_vax_age_gender_manu <- dat_vax[!is.na(vax_date), .(full = .N),
-                                            keyby = .(vax_date, ageRange_2, gender, manu_2)]
+                                            keyby = .(vax_date, ageRange_2, gender, manu_1)]
 names(daily_counts_vax_age_gender_manu) <- c("date", "ageRange", "gender", "manu", "full")
 daily_counts_vax_age_gender_manu <- merge(all_combs, daily_counts_vax_age_gender_manu, all.x=TRUE)
 daily_counts_vax_age_gender_manu[is.na(daily_counts_vax_age_gender_manu)] <- 0 
@@ -100,14 +111,17 @@ counts_partial_age_gender_manu <- counts_partial_age_gender_manu[, !c("n.y", "n.
 
 ## Boosters
 daily_counts_booster_age_gender_manu <- dat_vax[!is.na(booster_date), .(booster = .N),
-                                            keyby = .(booster_date, ageRange_3, gender, manu_3)]
+                                                keyby = .(booster_date, booster_ageRange, gender, booster_manu)]
 names(daily_counts_booster_age_gender_manu) <- c("date", "ageRange", "gender", "manu", "booster")
 daily_counts_booster_age_gender_manu <- merge(all_combs, daily_counts_booster_age_gender_manu, all.x=TRUE)
 daily_counts_booster_age_gender_manu[is.na(daily_counts_booster_age_gender_manu)] <- 0 
+counts_booster_age_gender_manu <- copy(daily_counts_booster_age_gender_manu)
+counts_booster_age_gender_manu[, booster := cumsum(booster), keyby = .(ageRange, gender, manu)]
+setnames(counts_booster_age_gender_manu, "booster", "n")
 
 ## Lost immunnity
 daily_counts_lost_age_gender_manu <- dat_vax[!is.na(last_immune_date), .(lost = .N),
-                                            keyby = .(last_immune_date, ageRange_2, gender, manu_2)]
+                                            keyby = .(last_immune_date, ageRange_2, gender, manu_1)]
 names(daily_counts_lost_age_gender_manu) <- c("date", "ageRange", "gender", "manu", "lost")
 #daily_counts_lost_age_gender_manu %>% group_by(week=round_date(date,"week")) %>% summarize(need_booster=sum(lost)) %>% ggplot(aes(week, need_booster)) + scale_y_continuous(labels = scales::comma) + geom_line() 
 daily_counts_lost_age_gender_manu <- merge(all_combs, daily_counts_lost_age_gender_manu, all.x=TRUE)
@@ -137,7 +151,7 @@ daily_vax_counts$ageRange <- factor(daily_vax_counts$ageRange, levels = age_leve
 
 ## Fully vaxed
 daily_counts_vax_age_gender_manu_muni <- dat_vax[!is.na(vax_date), .(full = .N),
-                                            keyby = .(vax_date, ageRange_2, gender, manu_2, municipio)]
+                                            keyby = .(vax_date, ageRange_2, gender, manu_1, municipio)]
 names(daily_counts_vax_age_gender_manu_muni) <- c("date", "ageRange", "gender", "manu", "municipio", "full")
 daily_counts_vax_age_gender_manu_muni <- merge(all_combs_muni, daily_counts_vax_age_gender_manu_muni, all.x=TRUE)
 daily_counts_vax_age_gender_manu_muni[is.na(daily_counts_vax_age_gender_manu_muni)] <- 0 
@@ -170,10 +184,13 @@ daily_counts_booster_age_gender_manu_muni <- dat_vax[!is.na(booster_date), .(boo
 names(daily_counts_booster_age_gender_manu_muni) <- c("date", "ageRange", "gender", "manu", "municipio", "booster")
 daily_counts_booster_age_gender_manu_muni <- merge(all_combs_muni, daily_counts_booster_age_gender_manu_muni, all.x=TRUE)
 daily_counts_booster_age_gender_manu_muni[is.na(daily_counts_booster_age_gender_manu_muni)] <- 0 
+counts_booster_age_gender_manu_muni <- copy(daily_counts_booster_age_gender_manu_muni)
+counts_booster_age_gender_manu_muni[, booster := cumsum(booster), keyby = .(ageRange, gender, manu, municipio)]
+setnames(counts_booster_age_gender_manu_muni, "booster", "n")
 
 ## Lost immunnity
 daily_counts_lost_age_gender_manu_muni <- dat_vax[!is.na(last_immune_date), .(lost = .N),
-                                             keyby = .(last_immune_date, ageRange_2, gender, manu_2, municipio)]
+                                             keyby = .(last_immune_date, ageRange_2, gender, manu_1, municipio)]
 names(daily_counts_lost_age_gender_manu_muni) <- c("date", "ageRange", "gender", "manu", "municipio", "lost")
 #daily_counts_lost_age_gender_manu_muni %>% group_by(week=round_date(date,"week")) %>% summarize(need_booster=sum(lost)) %>% ggplot(aes(week, need_booster)) +  scale_y_continuous(labels = scales::comma) + geom_line() 
 daily_counts_lost_age_gender_manu_muni <- merge(all_combs_muni, daily_counts_lost_age_gender_manu_muni, all.x=TRUE)
@@ -208,10 +225,16 @@ unvax[,n := poblacion - total]
 unvax[,manu := "UNV"]
 unvax <- unvax[,c("date", "ageRange","gender","manu", "n")]
 
-poblacion <- rbind(counts_vax_age_gender_manu[,status:="VAX"],
+## counting only vax
+counts_vax_age_gender_manu <- merge(counts_vax_age_gender_manu, counts_booster_age_gender_manu, by = c("date","ageRange","gender","manu"), all.x=TRUE)
+counts_vax_age_gender_manu[, n:=n.x-n.y]
+counts_vax_age_gender_manu <- counts_vax_age_gender_manu[, !c("n.x","n.y")]
+poblacion <- rbind(counts_booster_age_gender_manu[,status:="BST"],
+                   counts_vax_age_gender_manu[,status:="VAX"],
                    counts_partial_age_gender_manu[,status:="PAR"],
                    unvax[,status:="UNV"])
-poblacion$status <- factor(poblacion$status, levels = c("UNV", "PAR", "VAX"))
+
+poblacion$status <- factor(poblacion$status, levels = c("UNV", "PAR", "VAX", "BST"))
 poblacion$ageRange <- factor(poblacion$ageRange, levels = age_levels)
 #poblacion %>%  filter(status == "PAR") %>% ggplot(aes(date, n, color = gender)) + geom_line() + facet_grid(manu~ageRange) 
 
@@ -225,10 +248,15 @@ unvax[, n := poblacion - total]
 unvax[ ,manu := "UNV"]
 unvax <- unvax[,c("date", "municipio","ageRange","gender","manu", "n")]
 
-poblacion_muni <- rbind(counts_vax_age_gender_manu_muni[,status:="VAX"],
+counts_vax_age_gender_manu_muni <- merge(counts_vax_age_gender_manu_muni, counts_booster_age_gender_manu_muni, by = c("date","ageRange","gender","manu", "municipio"), all.x=TRUE)
+counts_vax_age_gender_manu_muni[, n:=n.x-n.y]
+counts_vax_age_gender_manu_muni <- counts_vax_age_gender_manu_muni[, !c("n.x","n.y")]
+
+poblacion_muni <- rbind(counts_booster_age_gender_manu_muni[,status:="BST"],
+                        counts_vax_age_gender_manu_muni[,status:="VAX"],
                    counts_partial_age_gender_manu_muni[,status:="PAR"],
                    unvax[,status:="UNV"])
-poblacion_muni$status <- factor(poblacion_muni$status, levels = c("UNV", "PAR", "VAX"))
+poblacion_muni$status <- factor(poblacion_muni$status, levels = c("UNV", "PAR", "VAX","BST"))
 poblacion_muni$ageRange <- factor(poblacion_muni$ageRange, levels = age_levels)
 poblacion_muni$municipio <- 
   factor(poblacion_muni$municipio, levels = muni_levels)
@@ -242,8 +270,7 @@ tab <- poblacion %>%
   mutate(n = ifelse(gender=="M", -n, n)) %>%
   arrange(gender, ageRange) %>%
   mutate(n = n/sum(abs(n))) %>%
-  mutate(etatus = recode(status, UNV = "No vacunados", PAR = "Parcial", VAX = "Vacunados")) %>%
-  rename(estatus = status) %>%
+  mutate(estatus = recode(status, UNV = "No vacunados", PAR = "Parcial", VAX = "Vacunados sin booster", BST = "Con booster")) %>%
   mutate(municipio = "Todos")
 
 tab_muni <- poblacion_muni %>%
@@ -257,9 +284,8 @@ tab_muni <- poblacion_muni %>%
   group_by(municipio) %>%
   mutate(n = n/sum(abs(n))) %>%
   ungroup() %>%
-  mutate(etatus = recode(status, UNV = "No vacunados", PAR = "Parcial", VAX = "Vacunados")) %>%
-  rename(estatus = status) 
-  
+  mutate(estatus = recode(status, UNV = "No vacunados", PAR = "Parcial", VAX = "Vacunados sin booster", BST = "Con booster")) 
+
 piramide <- bind_rows(tab, tab_muni)
 
 
@@ -303,26 +329,37 @@ rm(daily_counts_onedose_age_gender_manu,
 
 ## cases
 load(file.path(rda_path, "dat_cases_vax.rda"))
-dat_cases <- dat_cases_vax[!manu_1 %in% c("ATZ","OTR") & 
-                     !manu_2 %in% c("ATZ","OTR") &
-                     !manu_2 %in% c("ATZ","OTR"), ] 
-dat_cases$manu_1 <- droplevels(dat_cases$manu_1)
-dat_cases$manu_2 <- droplevels(dat_cases$manu_2)
-dat_cases$manu_3 <- droplevels(dat_cases$manu_3)
 
-dat_cases[estado %in% c("PR", "No reportado") , c("vax_date", "booster_date", "booster_manu") := .(date_2, date_3, manu_3)]
+dat_cases <- dat_cases_vax[!manu_1 %in% c("ATZ","OTR") & 
+                             !manu_2 %in% c("ATZ","OTR") &
+                             !manu_3 %in% c("ATZ","OTR") &
+                             (is.na(estado) | estado %in% c("PR", "No reportado")),]
+dat_cases <- dat_cases[(is.na(proveedor_1) | proveedor_1 != "Correccional") & 
+                         (is.na(proveedor_2) | proveedor_2 != "Correccional"),]
+dat_cases$manu_1 <- factor(dat_cases$manu_1, levels = manu_levels)
+dat_cases$manu_2 <- factor(dat_cases$manu_2, levels = manu_levels)
+dat_cases$manu_3 <- factor(dat_cases$manu_3, levels = manu_levels)
+
+dat_cases[manu_1 != "JSN", c("vax_date", "booster_date", "booster_manu") := .(date_2, date_3, manu_3)]
 dat_cases[manu_1 == "JSN", 
-        c("vax_date", "booster_date", "manu_2", "booster_manu") := .(date_1, date_2, manu_1, manu_2)] 
-dat_cases$manu <- factor(replace_na(as.character(dat_cases$manu_1), "UNV"),
-                             levels = manu_levels)
+          c("vax_date", "booster_date", "manu_2", "booster_manu") := .(date_1, date_2, manu_1, manu_2)] 
+dat_cases$manu <- factor(replace_na(as.character(dat_cases$manu_1), "UNV"), levels = manu_levels)
+
 dat_cases[!is.na(vax_date), vax_date := vax_date + days(14)]
+dat_cases[!is.na(booster_date) & manu != "JSN" & (booster_date < first_booster_day | booster_date - date_1 < days(180)), 
+          c("booster_date", "booster_manu", "booster_insert_date", "booster_proveedor", "booster_ageRange") := .(NA, NA, NA, NA, NA)]
+dat_cases[!is.na(booster_date) & manu == "JSN" & (booster_date < first_jnj_booster_day | booster_date - date_1 < days(60)), 
+          c("booster_date", "booster_manu", "booster_insert_date", "booster_proveedor", "booster_ageRange") := .(NA, NA, NA, NA, NA)]
+# not vaxed, can't be boosted
+dat_cases[!is.na(booster_date) & is.na(vax_date), 
+          c("booster_date", "booster_manu", "booster_insert_date", "booster_proveedor", "booster_ageRange") := .(NA, NA, NA, NA, NA)]
 dat_cases[, status := "UNV"]
 dat_cases[date > date_1, status := "PAR"]
 dat_cases[date > vax_date, status := "VAX"]
+dat_cases[date > booster_date, status := "BST"]
 dat_cases[date <= date_1, manu := "UNV"]
-dat_cases$status <- factor(dat_cases$status, levels = c("UNV", "PAR", "VAX"))
-dat_cases$booster <- FALSE
-dat_cases[!is.na(booster_date) & status == "VAX", booster := date > booster_date]
+dat_cases$status <- factor(dat_cases$status, levels = c("UNV", "PAR", "VAX", "BST"))
+
 
 all_combs <- CJ(date = all_dates$date, 
                 ageRange = levels(dat_cases$ageRange),
@@ -345,33 +382,35 @@ counts <- merge(merge(counts_cases, counts_hosp, all = TRUE), counts_death, all 
 counts <- merge(all_combs, counts, all.x = TRUE)
 counts[is.na(counts)] <- 0
 counts <- merge(counts, poblacion, all.x = TRUE)
+counts[is.na(counts)] <- 0
 counts$manu <- factor(counts$manu, levels = manu_levels)
-counts$status <- factor(counts$status,  levels = c("UNV", "PAR", "VAX"))
+counts$status <- factor(counts$status,  levels = c("UNV", "PAR", "VAX", "BST"))
 counts$ageRange <- factor(counts$ageRange, levels = age_levels)
-###################
-##counts by booster
-##################
-counts_cases <- dat_cases[booster==TRUE ,.(cases = .N), 
-                          keyby = .(date, ageRange, gender, manu)]
-counts_hosp <- dat_cases[booster==TRUE & hosp==TRUE, .(hosp = .N), 
-                         keyby = .(date_hosp, ageRange, gender, manu)]
-setnames(counts_hosp, "date_hosp", "date")
-counts_death <- dat_cases[booster==TRUE & death==TRUE,.(death = .N), 
-                           keyby = .(date_death, ageRange, gender, manu)]
-setnames(counts_death, "date_death", "date")
-all_combs <- CJ(date = all_dates$date, 
-                ageRange = levels(dat_cases$ageRange),
-                gender = levels(dat_cases$gender),
-                manu = manu_levels[-1])
-booster_counts <- merge(merge(counts_cases, counts_hosp, all = TRUE), 
-                        counts_death, all = TRUE)
-booster_counts <- merge(all_combs, booster_counts, all.x = TRUE)
-booster_counts[is.na(booster_counts)] <- 0
-booster_poblacion <- copy(daily_vax_counts)
-booster_poblacion[, n := cumsum(booster), keyby = .(ageRange, gender, manu)]
-booster_poblacion <- booster_poblacion[, !c("onedose","full","booster")]
-booster_counts <- merge(booster_counts, booster_poblacion, by = c("date", "ageRange", "gender", "manu"))
-booster_counts$manu <- factor(booster_counts$manu, levels=manu_levels[-1])
+
+# ###################
+# ##counts by booster
+# ##################
+# counts_cases <- dat_cases[booster==TRUE ,.(cases = .N), 
+#                           keyby = .(date, ageRange, gender, manu)]
+# counts_hosp <- dat_cases[booster==TRUE & hosp==TRUE, .(hosp = .N), 
+#                          keyby = .(date_hosp, ageRange, gender, manu)]
+# setnames(counts_hosp, "date_hosp", "date")
+# counts_death <- dat_cases[booster==TRUE & death==TRUE,.(death = .N), 
+#                            keyby = .(date_death, ageRange, gender, manu)]
+# setnames(counts_death, "date_death", "date")
+# all_combs <- CJ(date = all_dates$date, 
+#                 ageRange = levels(dat_cases$ageRange),
+#                 gender = levels(dat_cases$gender),
+#                 manu = manu_levels[-1])
+# booster_counts <- merge(merge(counts_cases, counts_hosp, all = TRUE), 
+#                         counts_death, all = TRUE)
+# booster_counts <- merge(all_combs, booster_counts, all.x = TRUE)
+# booster_counts[is.na(booster_counts)] <- 0
+# booster_poblacion <- copy(daily_vax_counts)
+# booster_poblacion[, n := cumsum(booster), keyby = .(ageRange, gender, manu)]
+# booster_poblacion <- booster_poblacion[, !c("onedose","full","booster")]
+# booster_counts <- merge(booster_counts, booster_poblacion, by = c("date", "ageRange", "gender", "manu"))
+# booster_counts$manu <- factor(booster_counts$manu, levels=manu_levels[-1])
 
 ### Summary tab
 
@@ -387,22 +426,44 @@ the_immune_prop <- the_immune/pr_pop
 booster <- sum(!is.na(dat_vax$booster_date))
 booster_prop <- booster/pr_pop
 
+pediatric_primera <- daily_vax_counts %>% filter(ageRange=="5-11" & date >= first_ped_day) %>%
+  pull(onedose) %>% sum(na.rm=TRUE)
+                                                   
+ped_pop <- pop_by_age_gender %>% filter(ageRange=="5-11") %>% pull(poblacion) %>% sum()
+pediatric_primera_prop <- pediatric_primera / ped_pop
+
+pediatric_completa <- daily_vax_counts %>% filter(ageRange=="5-11" & date >= first_ped_day) %>%
+  pull(full) %>% sum(na.rm=TRUE)
+
+pediatric_completa_prop <- pediatric_completa/ ped_pop
+
+lost <-  sum(daily_vax_counts$lost)
+lost_prop <-lost/pr_pop
+
 tasas <- daily_vax_counts %>% 
   filter(date %in% span_range) %>%
   summarize(onedose = sum(onedose)/length(span_range) * 7, 
             full = sum(full)/length(span_range)* 7 , 
             immune = (sum(full) - sum(lost))/length(span_range)*7,
-            booster = sum(booster)/length(span_range)  * 7)
-             
+            booster = sum(booster)/length(span_range)  * 7, 
+            lost = sum(lost)/length(span_range)*7)
+
+tasas_ped <- daily_vax_counts %>% 
+  filter(date %in% span_range & ageRange=="5-11") %>%
+  summarize(onedose = sum(onedose)/length(span_range) * 7, 
+            full= sum(full)/length(span_range) * 7)
+
 summary_tab <- data.frame(names = c("Vacunas administradas",
                             "Personas con por lo menos 1 dosis",
                             "Personas con dosis completa",
                             "Personas con dosis completa sin necesidad de booster",
-                            "Personas con boosters"),
-                  total = c(administradas, primera, completa, the_immune, booster),
-                  porciento = c(NA, primera_prop, completa_prop, the_immune_prop, booster_prop),
-                  tasas = tasas <- c(administradas_tasa, tasas$onedose, tasas$full, tasas$immune, tasas$booster))
-
+                            "Personas con boosters",
+                            "Personas con dosis completa con necesidad de booster",
+                            "Menores (5-11 años) con por lo menos 1 dosis",
+                            "Menores (5-11 años) con dosis completa"),
+                  total = c(administradas, primera, completa,  the_immune, booster, lost,  pediatric_primera, pediatric_completa),
+                  porciento = c(NA, primera_prop, completa_prop,  the_immune_prop, booster_prop, lost_prop,  pediatric_primera_prop, pediatric_completa_prop),
+                  tasas = c(administradas_tasa, tasas$onedose, tasas$full, tasas$immune, tasas$booster, tasas$lost, tasas_ped$onedose, tasas_ped$full))
 
 outcome_tab <- counts %>% group_by(status, manu) %>%
   summarize(n = sum(n, na.rm = TRUE)/365,
@@ -411,27 +472,11 @@ outcome_tab <- counts %>% group_by(status, manu) %>%
             .groups = "drop") %>%
   mutate(rate_cases = cases/n, rate_hosp = hosp/n, rate_death = death/n) 
 
-outcome_tab_booster <-  booster_counts %>% group_by(manu) %>%
-  summarize(n = sum(n, na.rm = TRUE)/365,
-            cases = sum(cases), hosp=sum(hosp), 
-            death = sum(death),
-            .groups = "drop") %>%
-  mutate(rate_cases = cases/n, rate_hosp = hosp/n, rate_death = death/n,
-         status = "Con booster")
-
-outcome_tab <- bind_rows(outcome_tab, outcome_tab_booster)
 
 totals <- poblacion %>% 
   filter(date == last_day) %>%
   group_by(manu, status) %>%
   summarize(total = sum(n, na.rm=TRUE), .groups = "drop")  
-
-totals_booster <- daily_vax_counts %>% 
-  group_by(manu) %>%
-  summarize(total = sum(booster), .groups = "drop") %>%
-  mutate(status = "Con booster")
-
-totals <- bind_rows(totals, totals_booster)
 
 outcome_tab <- left_join(outcome_tab, totals, by = c("manu", "status"))
 
@@ -451,14 +496,6 @@ proveedores <- bind_rows(
             rezago_esta_semana = mean(diff[insert_date >= today() - weeks(1)]),
             .groups = "drop")
 
-## Total - daily vaccine counts 
-
-total_daily_vax_counts <- daily_vax_counts %>% 
-  mutate(immunized = full - lost) %>%
-  pivot_longer(cols = c("onedose", "full", "booster", "lost", "immunized"),
-               names_to = "status_type", values_to = "daily") %>%
-  as.data.table()
-total_daily_vax_counts[, total := cumsum(daily), keyby = .( ageRange, manu, gender, status_type)]
 
 
 save(proveedores, file=file.path(rda_path ,"proveedores.rda"))
@@ -470,5 +507,4 @@ save(daily_vax_counts_by_municipio, file = file.path(rda_path, "daily_vax_counts
 save(dat_cases, file =  file.path(rda_path ,"dat_cases.rda"))
 save(immune, file = file.path(rda_path ,"immune.rda"))
 save(piramide, piramide_tab, file = file.path(rda_path, "piramide.rda"))
-save(total_daily_vax_counts, file=file.path(rda_path, "total_daily_vax_counts.rda"))
 
