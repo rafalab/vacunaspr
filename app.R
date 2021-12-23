@@ -124,8 +124,8 @@ ui <- fluidPage(
                                        selected = "all"),
                            width = 3),
                          mainPanel(
-                           plotOutput("mapa"),
-                           leafletOutput("mapa_leaflet"),
+                           #plotOutput("mapa"),
+                           #leafletOutput("mapa_leaflet"),
                            leafletOutput("mapa_leaflet_quantiles"),
                            DT::dataTableOutput("municipio_tabla")
                          )
@@ -552,7 +552,7 @@ server <- function(input, output, session) {
     #   geom_point()
     
     nBins <- 3
-    bins <- quantile(sorted_by_rate$rate, probs=seq(0,1, 1.0/nBins)) %>% round() %>% unname()
+    bins <- quantile(sorted_by_rate$rate, probs=seq(0,1, 1.0/nBins)) %>% unname()
     pal <- colorBin(rev(RColorBrewer::brewer.pal(nBins, "Reds")), domain = sorted_by_rate$rate, bins = bins)
     # min_rate <- sorted_by_rate[5,"rate"] / 100
     # max_rate <- sorted_by_rate[78-10, "rate"] / 100
@@ -602,7 +602,7 @@ server <- function(input, output, session) {
                             noHide = TRUE, direction = 'center',
                             textOnly = TRUE, textsize="7px")) %>%
       addLegend(pal = pal, values = ~rate, opacity = 1.0, title = "Población con dosis completa",
-                    position = "bottomright", labFormat = labelFormat(suffix='%'))
+                    position = "bottomright", labFormat = labelFormat(suffix='%', transform=round))
       # addLegendNumeric(pal = pal, values = c(min_rate*100,max_rate*100),
       #                  title = "Población con dosis completa", bins=3.0,
       #                  position = "bottomright", orientation='horizontal',
