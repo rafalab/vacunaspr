@@ -496,6 +496,32 @@ proveedores <- bind_rows(
             rezago_esta_semana = mean(diff[insert_date >= today() - weeks(1)]),
             .groups = "drop")
 
+## Seguimiento
+
+manu_info <- data.table(
+  manu=c("PFR", "MOD", "JSN"),
+  days_from_1_to_2=c(21, 28, 0),
+  days_from_2_to_boost=c(183, 183, 61)
+)
+manu_info
+
+
+dat_seguimiento <- dat_vax[!is.na(date_1)]
+
+
+dat_seguimiento[manu_1 ]
+
+seguimiento_intervalos <- data.table(
+  start_var=c('date_1', 'date_2'),
+  end_var  =c('date_2', 'booster_date')
+)
+
+dat_seguimiento <-
+melt(dat_vax, measure=list(
+  seguimiento_intervalos$start_var,
+  seguimiento_intervalos$end_var
+)
+)
 
 
 save(proveedores, file=file.path(rda_path ,"proveedores.rda"))
