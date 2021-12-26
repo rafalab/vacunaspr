@@ -507,22 +507,29 @@ manu_info
 
 
 dat_seguimiento <- dat_vax[!is.na(date_1)]
+dat_seguimiento[, date_2_sched := date_1 + manu_info$days_from_1_to_2[manu_1]]
+dat_seguimiento[, booster_date_sched := date_2 + manu_info$days_from_2_to_boost[manu_2]]
 
+dat_seguimiento[, patient_row := 1:nrow(dat_seguimiento)]
 
-dat_seguimiento[manu_1 ]
+# Print example
+dat_seguimiento[, .(date_1, date_2_sched, date_2, booster_date_sched, booster_date)]
 
 seguimiento_intervalos <- data.table(
-  start_var=c('date_1', 'date_2'),
-  end_var  =c('date_2', 'booster_date')
+  name=as.factor(c('1A-2S', '2S-2A', '2A-BS', 'BS-BA')),
+  start_var=c('date_1', 'date_2_sched', 'date_2', 'booster_date_sched'),
+  end_var  =c('date_2_sched', 'date_2', 'booster_date_sched', 'booster_date')
 )
 
-dat_seguimiento <-
-melt(dat_vax, measure=list(
+dat_seguimiento_melted <-
+melt(dat_seguimiento, measure=list(
   seguimiento_intervalos$start_var,
   seguimiento_intervalos$end_var
-)
-)
-
+), variable.name="interval", value.name=c('interval_start', 'interval_end')
+) %>%
+.[order(patient_row, interval)] %>%
+  .[, interval := seguimiento_intervalos$name[interval]] %>%
+  .[!(is.na(interval_start) & is.na(interval_end)),]
 
 save(proveedores, file=file.path(rda_path ,"proveedores.rda"))
 save(counts, file=file.path(rda_path ,"counts.rda"))
