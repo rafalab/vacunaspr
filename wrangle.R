@@ -531,6 +531,62 @@ melt(dat_seguimiento, measure=list(
   .[, interval := seguimiento_intervalos$name[interval]] %>%
   .[!(is.na(interval_start) & is.na(interval_end)),]
 
+dat_seguimiento_onedose <-
+dat_seguimiento_melted[interval == "1A-2S",] %>%
+  count(interval_start) %>%
+  rename(date=interval_start, onedose = n)
+
+dat_seguimiento_twodose <-
+  dat_seguimiento_melted[interval == "2A-BS",] %>%
+  count(interval_start) %>%
+  rename(date=interval_start, twodose = n)
+
+# dat_seguimiento_booster <-
+#   dat_seguimiento_melted[interval == "BS-BA",] %>%
+#   count(interval_end) %>%
+#   rename(booster = n)
+
+dat_seguimiento_twodose_expfill <-
+dat_seguimiento_melted[(interval == "2S-2A"), ] %>%
+  copy() %>%
+  .[, anticipated_end := interval_end] %>%
+  .[is.na(anticipated_end), anticipated_end := interval_start] %>%
+  count(anticipated_end) %>%
+  rename(date = anticipated_end, twodose_exp = n)
+
+
+dat_seguimiento_bydate <-
+  dat_seguimiento_onedose[dat_seguimiento_twodose, on='date'] %>%
+  .[dat_seguimiento_twodose_expfill, on='date'] %>%
+  mutate(onedose_cumu = cumsum(onedose),
+         twodose_cumu = cumsum(twodose),
+         twodose_exp_cumu = cumsum(twodose_exp)) %>%
+  #rename(date = interval_start) %>%
+  mutate_if(is.numeric, list(~ ./pr_pop)) %>%
+  filter(date <= last_day)
+
+dat_seguimiento_plotting <- dat_seguimiento_bydate %>%
+  melt(id.vars = c("date")) %>%
+  mutate(variable = as.factor(variable))
+
+dat_seguimiento_plotting %>%
+  filter(variable %in% c('onedose_cumu','twodose_cumu','twodose_exp_cumu')) %>%
+  mutate(variable = factor(variable, levels=c('onedose_cumu','twodose_exp_cumu','twodose_cumu'))) %>%
+ggplot(aes(x = date, y = value, colour = variable)) + 
+  theme_bw() +
+  geom_line() +
+  # geom_line(aes(y = onedose_cumu, colour = "Una")) + 
+  # geom_line(aes(y = twodose_exp_cumu, colour = "Completa (anticipado)")) +
+  # geom_line(aes(y = twodose_cumu, colour = "Completa (en realidad)")) +
+  
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1), limits=c(0,1)) +
+  scale_color_manual(name = "Dosis", values = c("onedose_cumu" = "black",
+                                  "twodose_exp_cumu" = "darkred",
+                                  "twodose_cumu" = "red"
+                                  )) +
+  #theme(legend.position="bottom") +
+  #guides(colour = guide_legend(reverse = TRUE))
+
 save(proveedores, file=file.path(rda_path ,"proveedores.rda"))
 save(counts, file=file.path(rda_path ,"counts.rda"))
 save(summary_tab, outcome_tab, file=file.path(rda_path ,"tabs.rda"))
