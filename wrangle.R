@@ -507,18 +507,18 @@ manu_info
 
 
 dat_seguimiento <- dat_vax[!is.na(date_1)]
-dat_seguimiento[, date_2_sched := date_1 + manu_info$days_from_1_to_2[manu_1]]
-dat_seguimiento[, booster_date_sched := date_2 + manu_info$days_from_2_to_boost[manu_2]]
+dat_seguimiento[, vax_date_sched := date_1 + manu_info$days_from_1_to_2[manu_1] + days(14)]
+dat_seguimiento[, booster_date_sched := vax_date + manu_info$days_from_2_to_boost[manu_1]]
 
 dat_seguimiento[, patient_row := 1:nrow(dat_seguimiento)]
 
 # Print example
-dat_seguimiento[, .(date_1, date_2_sched, date_2, booster_date_sched, booster_date)]
+dat_seguimiento[, .(date_1, vax_date_sched, vax_date, booster_date_sched, booster_date)]
 
 seguimiento_intervalos <- data.table(
-  name=as.factor(c('1A-2S', '2S-2A', '2A-BS', 'BS-BA')),
-  start_var=c('date_1', 'date_2_sched', 'date_2', 'booster_date_sched'),
-  end_var  =c('date_2_sched', 'date_2', 'booster_date_sched', 'booster_date')
+  name=as.factor(c('1A-VS', 'VS-VA', 'VA-BS', 'BS-BA')),
+  start_var=c('date_1', 'vax_date_sched', 'vax_date', 'booster_date_sched'),
+  end_var  =c('vax_date_sched', 'vax_date', 'booster_date_sched', 'booster_date')
 )
 
 dat_seguimiento_melted <-
@@ -532,36 +532,50 @@ melt(dat_seguimiento, measure=list(
   .[!(is.na(interval_start) & is.na(interval_end)),]
 
 dat_seguimiento_onedose <-
-dat_seguimiento_melted[interval == "1A-2S",] %>%
+dat_seguimiento_melted[interval == "1A-VS",] %>%
   count(interval_start) %>%
   rename(date=interval_start, onedose = n)
 
-dat_seguimiento_twodose <-
-  dat_seguimiento_melted[interval == "2A-BS",] %>%
+dat_seguimiento_complete <-
+  dat_seguimiento_melted[interval == "VA-BS",] %>%
   count(interval_start) %>%
-  rename(date=interval_start, twodose = n)
+  rename(date=interval_start, complete = n)
 
-# dat_seguimiento_booster <-
-#   dat_seguimiento_melted[interval == "BS-BA",] %>%
-#   count(interval_end) %>%
-#   rename(booster = n)
+dat_seguimiento_booster <-
+  dat_seguimiento_melted[interval == "BS-BA",] %>%
+  count(interval_end) %>%
+  rename(date = interval_end, booster = n) %>%
+  .[!is.na(date),]
 
-dat_seguimiento_twodose_expfill <-
-dat_seguimiento_melted[(interval == "2S-2A"), ] %>%
+dat_seguimiento_complete_expfill <-
+dat_seguimiento_melted[(interval == "VS-VA"), ] %>%
   copy() %>%
   .[, anticipated_end := interval_end] %>%
   .[is.na(anticipated_end), anticipated_end := interval_start] %>%
   count(anticipated_end) %>%
-  rename(date = anticipated_end, twodose_exp = n)
+  rename(date = anticipated_end, complete_exp = n)
 
+dat_seguimiento_booster_expfill <-
+  dat_seguimiento_melted[(interval == "BS-BA"), ] %>%
+  copy() %>%
+  .[, anticipated_end := interval_end] %>%
+  .[is.na(anticipated_end), anticipated_end := interval_start] %>%
+  count(anticipated_end) %>%
+  rename(date = anticipated_end, booster_exp = n)
 
 dat_seguimiento_bydate <-
-  dat_seguimiento_onedose[dat_seguimiento_twodose, on='date'] %>%
-  .[dat_seguimiento_twodose_expfill, on='date'] %>%
+  merge(dat_seguimiento_onedose, dat_seguimiento_complete, all=T, on='date') %>%
+  merge(., dat_seguimiento_booster, all=T, on='date') %>%
+  #dat_seguimiento_onedose[dat_seguimiento_twodose, on='date'] %>%
+  merge(dat_seguimiento_complete_expfill, all=T, on='date') %>%
+  merge(dat_seguimiento_booster_expfill, all=T, on='date') %>%
+  #.[dat_seguimiento_twodose_expfill, on='date'] %>%
+  mutate_if(is.numeric, list(~ coalesce(., 0))) %>%
   mutate(onedose_cumu = cumsum(onedose),
-         twodose_cumu = cumsum(twodose),
-         twodose_exp_cumu = cumsum(twodose_exp)) %>%
-  #rename(date = interval_start) %>%
+         complete_cumu = cumsum(complete),
+         complete_exp_cumu = cumsum(complete_exp),
+         booster_cumu = cumsum(booster),
+         booster_exp_cumu = cumsum(booster_exp)) %>%
   mutate_if(is.numeric, list(~ ./pr_pop)) %>%
   filter(date <= last_day)
 
@@ -570,8 +584,8 @@ dat_seguimiento_plotting <- dat_seguimiento_bydate %>%
   mutate(variable = as.factor(variable))
 
 dat_seguimiento_plotting %>%
-  filter(variable %in% c('onedose_cumu','twodose_cumu','twodose_exp_cumu')) %>%
-  mutate(variable = factor(variable, levels=c('onedose_cumu','twodose_exp_cumu','twodose_cumu'))) %>%
+  filter(variable %in% c('onedose_cumu','complete_cumu','complete_exp_cumu', 'booster_cumu', 'booster_exp_cumu')) %>%
+  mutate(variable = factor(variable, levels=c('onedose_cumu','complete_exp_cumu','complete_cumu', 'booster_exp_cumu', 'booster_cumu'))) %>%
 ggplot(aes(x = date, y = value, colour = variable)) + 
   theme_bw() +
   geom_line() +
@@ -581,11 +595,19 @@ ggplot(aes(x = date, y = value, colour = variable)) +
   
   scale_y_continuous(labels = scales::percent_format(accuracy = 1), limits=c(0,1)) +
   scale_color_manual(name = "Dosis", values = c("onedose_cumu" = "black",
-                                  "twodose_exp_cumu" = "darkred",
-                                  "twodose_cumu" = "red"
+                                  "complete_exp_cumu" = "darkred",
+                                  "complete_cumu" = "red",
+                                  "booster_cumu" = "orange",
+                                  "booster_exp_cumu" = "darkorange"
                                   )) +
   #theme(legend.position="bottom") +
   #guides(colour = guide_legend(reverse = TRUE))
+  geom_ribbon(data=dat_seguimiento_bydate, 
+              aes(x=date, ymin=complete_cumu,ymax=complete_exp_cumu), fill="darkred", alpha=0.7,
+              inherit.aes = F) +
+  geom_ribbon(data=dat_seguimiento_bydate,
+              aes(x=date, ymin=booster_cumu,ymax=booster_exp_cumu), fill="darkorange", alpha=0.7,
+              inherit.aes = F) +
 
 save(proveedores, file=file.path(rda_path ,"proveedores.rda"))
 save(counts, file=file.path(rda_path ,"counts.rda"))
