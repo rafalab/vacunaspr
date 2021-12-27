@@ -588,26 +588,40 @@ dat_seguimiento_plotting %>%
   mutate(variable = factor(variable, levels=c('onedose_cumu','complete_exp_cumu','complete_cumu', 'booster_exp_cumu', 'booster_cumu'))) %>%
 ggplot(aes(x = date, y = value, colour = variable)) + 
   theme_bw() +
-  geom_line() +
-  # geom_line(aes(y = onedose_cumu, colour = "Una")) + 
-  # geom_line(aes(y = twodose_exp_cumu, colour = "Completa (anticipado)")) +
-  # geom_line(aes(y = twodose_cumu, colour = "Completa (en realidad)")) +
-  
-  scale_y_continuous(labels = scales::percent_format(accuracy = 1), limits=c(0,1)) +
-  scale_color_manual(name = "Dosis", values = c("onedose_cumu" = "black",
-                                  "complete_exp_cumu" = "darkred",
-                                  "complete_cumu" = "red",
-                                  "booster_cumu" = "orange",
-                                  "booster_exp_cumu" = "darkorange"
-                                  )) +
-  #theme(legend.position="bottom") +
-  #guides(colour = guide_legend(reverse = TRUE))
   geom_ribbon(data=dat_seguimiento_bydate, 
               aes(x=date, ymin=complete_cumu,ymax=complete_exp_cumu), fill="darkred", alpha=0.7,
               inherit.aes = F) +
   geom_ribbon(data=dat_seguimiento_bydate,
               aes(x=date, ymin=booster_cumu,ymax=booster_exp_cumu), fill="darkorange", alpha=0.7,
               inherit.aes = F) +
+  geom_line(size=0.5) +
+  # geom_line(aes(y = onedose_cumu, colour = "Una")) + 
+  # geom_line(aes(y = twodose_exp_cumu, colour = "Completa (anticipado)")) +
+  # geom_line(aes(y = twodose_cumu, colour = "Completa (en realidad)")) +
+  
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1), limits=c(0,1)) +
+  scale_color_manual(name = "Dosis", 
+                       values = c("onedose_cumu" = "black",
+                                  "complete_exp_cumu" = "darkred",
+                                  "complete_cumu" = "black",
+                                  "booster_cumu" = "black",
+                                  "booster_exp_cumu" = "darkorange"
+                                  ),
+                       labels = c("onedose_cumu" = "Solo una",
+                                  "complete_exp_cumu" = "Completa (anticipada)",
+                                  "complete_cumu" = "Completa (en realidad)",
+                                  "booster_cumu" = "Booster (en realidad)",
+                                  "booster_exp_cumu" = "Booster (anticipada)"
+                                  )
+                     ) +
+  theme(legend.title = element_text(size=8),
+        legend.text = element_text(size=5),
+        legend.margin=margin(0,0,0,0),
+        legend.box.margin=margin(0,0,0,0)) +
+  xlab("Fecha") +
+  ylab("Población")
+  
+ggsave('seguimiento.png',dpi=300)
 
 save(proveedores, file=file.path(rda_path ,"proveedores.rda"))
 save(counts, file=file.path(rda_path ,"counts.rda"))
