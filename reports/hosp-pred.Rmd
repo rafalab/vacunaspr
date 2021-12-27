@@ -88,7 +88,7 @@ total <-  tab  %>%
 
 Dear Drs. Carlos Mellado and Melissa Marzán,
 
-Laboratory confirmed SARS-Cov-2 infections have exploded during the last two weeks: detected cases jumped from 100 per day to over 5,000 per day in just two weeks. A current concern is that hospitalizations will increase at a similarly rapid pace to levels that the health system is not prepared to attend. For this reason, I am sharing a preliminary statistical analysis and code that I hope you find useful. The code to run the analysis can be found here: 
+Laboratory confirmed SARS-Cov-2 infections have exploded during the last two weeks: detected cases jumped from 100 per day to over 5,000 per day in just two weeks. A current concern is that hospitalizations will increase at a similarly rapid pace to levels that the health system is not prepared to attend. For this reason, I am sharing a preliminary statistical analysis and code that I hope you find useful. The code to run the analysis can be found here: \url{https://github.com/rafalab/vacunaspr/blob/main/reports/hosp-pred.Rmd}
 
 The analysis computes hospitalization rates by age group and vaccination status during the previous surge, then uses these to compute the expected number of cases that will be hospitalized in this current surge. With the same rate as in the delta variant surge, we expected that `r make_pretty(round(total$exp[1]))` of the `r make_pretty(total$cases[1])` cases detected the week ending on `r date_format(last_day)` will be hospitalized. If the omicron variant is half as severe as the delta variant then this number is halved to `r make_pretty(round(total$exp[1]/2))`, and if it's only 25% as sever then it is reduced to `r make_pretty(round(total$exp[1]/4))`. Current, and very preliminary, estimates find that omicron is from 25% to 60% as sever as delta.
 
@@ -123,14 +123,14 @@ exp_hosp %>%   filter(date>=first_plot_day & date<=last_day) %>%
   ylab("Expected hospitalizations")+
   labs(title = "Expected daily added hospitalizations in Puerto Rico",
        subtitle = "Assuming same rates as delta variant") +
-  theme(legend.position = "bottom") +
   theme_bw() +
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1), 
+        legend.position = "bottom")
 ```
 
 These can be added up to obtain totals:
 
-```{r, fig.cap = "Expected daily new hospitalizations byvaccination status. This plot assumes the same hospitalization rate as in the previous surge.", fig.width = 6, fig.height = 3, out.width="50%"}
+```{r, fig.cap = "Expected daily new hospitalizations by vaccination status. This plot assumes the same hospitalization rate as in the previous surge.", fig.width = 6, fig.height = 3, out.width="50%"}
 exp_hosp %>%  filter(date>=first_plot_day & date<=last_day) %>%
   group_by(exp_date, status) %>%
   summarize(exp=sum(exp), avg=sum(avg), .groups = "drop") %>%
@@ -141,7 +141,8 @@ exp_hosp %>%  filter(date>=first_plot_day & date<=last_day) %>%
   ylab("Expected hospitalizations")+
   labs(title = "Expected daily hospitalizations in Puerto Rico",
        subtitle = "Assuming same rates as delta variant") +
-  theme(legend.position = "bottom") +theme_bw()
+  theme(legend.position = "bottom") +
+  theme_bw()
 ```
 
 I hope you find this analysis useful. As always, if you have any questions or concerns do not hesitate to contact me.
