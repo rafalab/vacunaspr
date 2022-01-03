@@ -571,11 +571,17 @@ dat_seguimiento_bydate <-
   merge(dat_seguimiento_booster_expfill, all=T, on='date') %>%
   #.[dat_seguimiento_twodose_expfill, on='date'] %>%
   mutate_if(is.numeric, list(~ coalesce(., 0))) %>%
+  mutate(complete_deficit = complete_exp - complete,
+         booster_deficit = booster_exp - booster,
+         ontime = onedose - complete_deficit - booster_deficit) %>%
   mutate(onedose_cumu = cumsum(onedose),
          complete_cumu = cumsum(complete),
          complete_exp_cumu = cumsum(complete_exp),
+         complete_deficit_cumu = cumsum(complete_deficit),
          booster_cumu = cumsum(booster),
-         booster_exp_cumu = cumsum(booster_exp)) %>%
+         booster_exp_cumu = cumsum(booster_exp),
+         booster_deficit_cumu = cumsum(booster_deficit),
+         ontime_cumu = cumsum(ontime)) %>%
   mutate_if(is.numeric, list(~ ./pr_pop)) %>%
   filter(date <= last_day)
 
@@ -619,9 +625,12 @@ ggplot(aes(x = date, y = value, colour = variable)) +
         legend.margin=margin(0,0,0,0),
         legend.box.margin=margin(0,0,0,0)) +
   xlab("Fecha") +
-  ylab("Población")
+  ylab("Población") +
+  ggtitle("Seguimiento de vacunación en Puerto Rico")
   
 ggsave('seguimiento.png',dpi=300)
+
+
 
 save(proveedores, file=file.path(rda_path ,"proveedores.rda"))
 save(counts, file=file.path(rda_path ,"counts.rda"))
