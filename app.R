@@ -276,10 +276,10 @@ server <- function(input, output, session) {
        labs(y="Tasa por día por 100,000", x="Fecha", title = the_title, 
             caption = paste("Basado en media móvil de", the_k,"días")) +
        scale_color_manual(
-         labels = c(manu_labels[["UNV"]], manu_labels[["MOD"]], manu_labels[["PFR"]],
-                    manu_labels[["JSN"]]),
-         values = c(manu_colors[["UNV"]], manu_colors[["MOD"]], manu_colors[["PFR"]],
-                    manu_colors[["JSN"]]), name="Vacuna:") +
+         labels = c(UNV=manu_labels[["UNV"]], MOD=manu_labels[["MOD"]], PFR=manu_labels[["PFR"]],
+                    JSN=manu_labels[["JSN"]]),
+         values = c(UNV=manu_colors[["UNV"]], MOD=manu_colors[["MOD"]], PFR=manu_colors[["PFR"]],
+                    JSN=manu_colors[["JSN"]]), name="Vacuna:") +
        theme_bw()+
        theme(legend.position = "bottom", text = element_text(size = 15)) +
        scale_x_date(date_labels = "%b", breaks = scales::breaks_width("1 month"))
@@ -527,10 +527,10 @@ server <- function(input, output, session) {
     
     show_legend <- TRUE
     if(input$graficas_manu=="facet"){
-      labels_manu <- c(manu_labels[["JSN"]], manu_labels[["MOD"]],
-                        manu_labels[["PFR"]])
-      values_manu <- c(manu_colors[["JSN"]], manu_colors[["MOD"]],
-                       manu_colors[["PFR"]])
+      labels_manu <- c(JSN=manu_labels[["JSN"]], MOD=manu_labels[["MOD"]],
+                        PFR=manu_labels[["PFR"]])
+      values_manu <- c(JSN=manu_colors[["JSN"]], MOD=manu_colors[["MOD"]],
+                       PFR=manu_colors[["PFR"]])
       fill_name = "Vacunas:"
       legend_pstn = "bottom"
     } else{

@@ -1,0 +1,153 @@
+---
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message=FALSE)
+```
+
+```{r, include=FALSE}
+library(flextable)
+set_flextable_defaults(fonts_ignore=TRUE)
+library(tidyverse)
+library(lubridate)
+date_format <- function(x) format(x, "%B %e, %Y")
+make_pct <- function(x, digit = 1) ifelse(is.na(x), "", paste0(format(round(100*x, digit = digit), nsmall = digit), "%"))
+make_pretty <- function(x) prettyNum(replace_na(x, " "), big.mark = ",")
+ma7 <- function(d, y, k = 7) 
+  tibble(date = d, moving_avg = as.numeric(stats::filter(y, rep(1/k, k), side = 1)))
+
+```
+
+
+```{r}
+last_day <- make_date(2021,12,23)
+first_plot_day <- make_date(2021, 12, 1)
+
+load("../rdas/dat_cases_vax.rda")
+delay <- dat_cases_vax %>%
+  mutate(delay = as.numeric(date_hosp - date)) %>%
+  filter(!is.na(delay) & delay>=0 & delay <= 14 & !is.na(ageRange)) %>%
+  group_by(ageRange) %>%
+  summarize(delay = mean(delay), .groups = "drop") 
+
+load("../rdas/counts.rda")
+baseline <- counts %>% 
+  mutate(status = fct_collapse(status, 
+                               VAX=c("VAX","BST"),
+                               UNV=c("UNV", "PAR"))) %>%
+  filter(date>=make_date(2021, 5, 15) & 
+           date<= make_date(2021, 11, 15)) %>%
+  group_by(status, ageRange) %>%
+  summarize(rate = sum(hosp)/sum(cases), .groups = "drop")
+baseline[is.na(baseline)] <- 0.001 ##assume at least a 0.1% chance
+
+omicron <- counts %>% 
+  mutate(status = fct_collapse(status, 
+                               VAX=c("VAX","BST"),
+                               UNV=c("UNV", "PAR"))) %>%
+  filter(date>=make_date(2021, 12, 1) & 
+           date<= last_day-weeks(1)) %>%
+  group_by(status, ageRange) %>%
+  summarize(rate = sum(hosp)/sum(cases), .groups = "drop")
+
+severe<-left_join(baseline, omicron, by = c("ageRange", "status")) %>%
+  mutate(diff= rate.x/rate.y) %>% group_by(status) %>%
+  summarize(median(diff, na.rm=TRUE))
+
+exp_hosp <- counts %>% 
+  mutate(status = fct_collapse(status, 
+                               VAX=c("VAX","BST"),
+                               UNV=c("UNV", "PAR"))) %>%
+  filter(date>=make_date(2021, 11, 21)) %>%
+  group_by(date, status, ageRange) %>%
+  summarize(cases = sum(cases), .groups = "drop") %>%
+  left_join(baseline, by = c("status", "ageRange")) %>%
+  mutate(exp_date = date + 3) %>%
+  arrange(desc(ageRange), status) %>%
+  mutate(exp = rate*cases) %>%
+  relocate(ageRange) %>%
+  group_by(ageRange) %>%
+  mutate(avg = ma7(exp_date, exp)$moving_avg) %>%
+  ungroup() 
+
+tab <- exp_hosp %>% 
+  filter(date>last_day-weeks(1) & date<= last_day)%>%
+  group_by(ageRange, status) %>%
+  summarize(cases = sum(cases), 
+            rate = rate[1], 
+            exp = sum(exp), .groups = "drop") %>%
+  mutate(exp_50=exp*.5, exp_25=exp*.25) %>%
+  arrange(desc(ageRange))
+
+total <-  tab  %>%
+  summarise(across(where(is.numeric), ~ sum(.x, na.rm = TRUE))) %>%
+  select(-rate)
+```
+
+`r date_format(today())`
+
+Dear Drs. Carlos Mellado and Melissa Marzán,
+
+Laboratory confirmed SARS-Cov-2 infections have exploded during the last two weeks: detected cases jumped from 100 per day to over 5,000 per day in just two weeks. A current concern is that hospitalizations will increase at a similarly rapid pace to levels that the health system is not prepared to attend. For this reason, I am sharing a preliminary statistical analysis and code that I hope you find useful. The code to run the analysis can be found here: \url{https://github.com/rafalab/vacunaspr/blob/main/reports/hosp-pred.Rmd}
+
+The analysis computes hospitalization rates by age group and vaccination status during the previous surge, then uses these to compute the expected number of cases that will be hospitalized in this current surge. With the same rate as in the delta variant surge, we expected that `r make_pretty(round(total$exp[1]))` of the `r make_pretty(total$cases[1])` cases detected the week ending on `r date_format(last_day)` will be hospitalized. If the omicron variant is half as severe as the delta variant then this number is halved to `r make_pretty(round(total$exp[1]/2))`, and if it's only 25% as severe then it is reduced to `r make_pretty(round(total$exp[1]/4))`. Current, and very preliminary, estimates find that omicron is from 25% to 60% as severe as delta.
+
+The table below shows us the expected hospitalizations per age group and vaccination status based on  cases detected the week ending 
+`r date_format(last_day)`:
+
+```{r}
+tab %>% mutate(exp=round(exp), exp_50=round(exp_50), exp_25=round(exp_25)) %>%
+  mutate(rate = make_pct(rate)) %>%
+  mutate(status = recode(status, VAX="Vaccinated", UNV="Unvaccinated")) %>%
+ setNames(c("Age group", "Vaccination status",
+                        "Number of cases this week", "% of cases that were hospitalized for delta", "Expected hospitalization", "Expected if 1/2 as severe", 
+            "Expected if 1/4 as severe")) %>%
+  flextable() %>%
+  theme_vanilla() %>%
+  flextable::fontsize(size = 8, part="all") %>%
+  line_spacing(space = 0.25, part = "body")
+```
+
+Important to note that during this week, only
+`r tab %>% filter(ageRange %in% c("60-69", "70-79", "80+")) %>% pull(cases) %>% sum %>% make_pretty()` of 
+ the `r make_pretty(total$cases[1])` cases are older than 60. This number is growing and if transmissions from younger individuals is not stopped, the expected hospitalizations may grow rapidly. I therefore highly recommend monitoring the case tendencies among older populations. You can do this 
+by examining plots such as the following that shows expected hospitalizations per day.
+
+```{r, fig.cap = "Expected daily new hospitalizations by age group and vaccination status. This plot assumes the same hospitalization rate as in the previous surge.", fig.width = 8, fig.height = 4, out.width="100%"}
+exp_hosp %>%   filter(date>=first_plot_day & date<=last_day) %>%
+  ggplot(aes(exp_date, exp, fill = status)) +
+  geom_col(alpha = 0.75, show.legend = FALSE)+
+  geom_line(aes(y=avg,color = status)) +
+  facet_wrap(~ageRange, nrow=2) + theme_bw()+
+  xlab("Expected date") +
+  ylab("Expected hospitalizations")+
+  labs(title = "Expected daily added hospitalizations in Puerto Rico",
+       subtitle = "Assuming same rates as delta variant") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1), 
+        legend.position = "bottom")
+```
+
+These can be added up to obtain totals:
+
+```{r, fig.cap = "Expected daily new hospitalizations by vaccination status. This plot assumes the same hospitalization rate as in the previous surge.", fig.width = 6, fig.height = 3, out.width="50%"}
+exp_hosp %>%  filter(date>=first_plot_day & date<=last_day) %>%
+  group_by(exp_date, status) %>%
+  summarize(exp=sum(exp), avg=sum(avg), .groups = "drop") %>%
+  ggplot(aes(exp_date, exp, fill = status)) +
+  geom_col(alpha = 0.75, show.legend = FALSE)+
+  geom_line(aes(y=avg,color = status)) +
+  xlab("Expected date") +
+  ylab("Expected hospitalizations")+
+  labs(title = "Expected daily hospitalizations in Puerto Rico",
+       subtitle = "Assuming same rates as delta variant") +
+  theme(legend.position = "bottom") +
+  theme_bw()
+```
+
+I hope you find this analysis useful. As always, if you have any questions or concerns do not hesitate to contact me.
+
+Best wishes,
+
+Rafael A. Irizarry
