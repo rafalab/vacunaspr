@@ -630,7 +630,26 @@ ggplot(aes(x = date, y = value, colour = variable)) +
   
 ggsave('seguimiento.png',dpi=300)
 
+dat_seguimiento_bydate %>%
+ggplot(aes(x = date)) + 
+  theme_bw() +
+  geom_ribbon(aes(ymin=ontime_cumu,
+                  ymax=ontime_cumu + booster_deficit_cumu,
+                  fill='booster'),  alpha=0.7,
+              inherit.aes = T) +
+  geom_ribbon(aes(ymin=ontime_cumu+booster_deficit_cumu,
+                  ymax=ontime_cumu + booster_deficit_cumu+complete_deficit_cumu,
+                  fill='complete'), alpha=0.7,
+              inherit.aes = T) +
+  geom_line(aes(y = ontime_cumu), size=1) +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1), limits=c(0,1)) +
+  scale_fill_manual(name='Aun sin recibir:',labels=c('Booster', 'Segunda dosis'), values=c('darkorange', 'red'),
+                    guide = guide_legend(reverse = TRUE)) +
+  xlab("Fecha") +
+  ylab("Población") +
+  ggtitle("Población con vacunación COVID-19 up-to-date\nen Puerto Rico") 
 
+ggsave('vacunados_up-to-date.png',dpi=300)
 
 save(proveedores, file=file.path(rda_path ,"proveedores.rda"))
 save(counts, file=file.path(rda_path ,"counts.rda"))
