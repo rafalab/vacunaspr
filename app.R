@@ -207,7 +207,7 @@ server <- function(input, output, session) {
   output$titulo_3 <- renderText({
     load(file.path(rda_path, "dates.rda"))
     paste("<h4>Resumen para semana acabando", 
-          format(last_day-weeks(2), "%B %d, %Y:"), " (datos aun no completos):</h4>")})
+          format(last_day-weeks(1), "%B %d, %Y"), " (datos aun no completos):</h4>")})
   
   output$update <- renderText({
     paste0("<h4>Última actualización: ", format(the_stamp, "%B %d, %Y"), "</h4>")
