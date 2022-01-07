@@ -258,7 +258,7 @@ server <- function(input, output, session) {
      the_k <- case_when(input$event_type == "death" ~ 60,
                         input$event_type == "hosp" ~ 30,
                         input$event_type == "cases" ~ 14)
-     p <- counts %>% 
+     tmp <- counts %>% 
        filter(status %in% c("VAX", "UNV", "BST")) %>%
        filter(!(status == "BST" & manu == "JSN")) %>%
        mutate(outcome = !!sym(input$event_type)) %>%
@@ -270,8 +270,9 @@ server <- function(input, output, session) {
        ungroup() %>%
        filter(date >= input$event_range[1] & date <= input$event_range[2]) %>%
        filter(denom > 10000) %>%
-       mutate(Booster = factor(ifelse(status != "BST",  "Sin", "Con"), levels = c("Sin", "Con"))) %>%
-       ggplot(aes(date, rate, color = manu, lty = Booster)) +
+       mutate(Booster = factor(ifelse(status != "BST",  "Sin", "Con"), levels = c("Sin", "Con"))) 
+     
+       p <- tmp %>% ggplot(aes(date, rate, color = manu, lty = Booster)) +
        geom_line(lwd = 1.25, alpha = 0.7) +
        labs(y="Tasa por día por 100,000", x="Fecha", title = the_title, 
             caption = paste("Basado en media móvil de", the_k,"días.\nArea gris contiene datos incompletos.")) +
@@ -289,9 +290,11 @@ server <- function(input, output, session) {
      
      if(input$event_range[2]>last_day-days(14)){
        p <- p + 
-          geom_ribbon(aes(xmin = pmax(last_day-days(14), input$event_range[1]),
-                          xmax = pmin(last_day, input$event_range[2])), alpha =0.25,
-                      color = NA, show.legend = FALSE)
+          annotate("rect", 
+                   xmin = pmax(last_day-days(14), input$event_range[1]),
+                   xmax = pmin(last_day, input$event_range[2]),
+                   ymin = min(tmp$rate, na.rm = TRUE),
+                   ymax = max(tmp$rate, na.rm = TRUE), alpha =0.2)
      }
      
      return(p)
