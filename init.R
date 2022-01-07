@@ -17,6 +17,11 @@ Sys.setlocale("LC_TIME", "es_ES")
 
 load(file.path(rda_path, "dates.rda"))
 
+status_colors <- c(UNV = RColorBrewer::brewer.pal(8, "Greys")[5],
+                   PAR = RColorBrewer::brewer.pal(8, "Greys")[4], 
+                   VAX = RColorBrewer::brewer.pal(8, "Greys")[3], 
+                   BST = RColorBrewer::brewer.pal(8, "Greys")[2])
+
 manu_labels <- c(UNV = "No vacunados", MOD = "Moderna",
                  PFR = "Pfizer", JSN = "J & J")
 
