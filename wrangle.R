@@ -445,10 +445,20 @@ summary_tab <- data.frame(names = c("Vacunas administradas",
                   porciento = c(NA, primera_prop, completa_prop,  the_immune_prop, booster_prop, lost_prop,  pediatric_primera_prop, pediatric_completa_prop),
                   tasas = c(administradas_tasa, tasas$onedose, tasas$full, tasas$immune, tasas$booster, tasas$lost, tasas_ped$onedose, tasas_ped$full))
 
-outcome_tab <- counts %>% 
+outcome_tab_details <- counts %>% 
   filter(date>last_day - weeks(3) & date<=last_day - weeks(1)) %>%
   mutate(complete_week = date <= last_day - weeks(2)) %>%
   group_by(complete_week, status, manu) %>%
+  summarize(n = sum(n, na.rm = TRUE)/7,
+            cases = sum(cases), hosp=sum(hosp), 
+            death = sum(death),
+            .groups = "drop") %>%
+  mutate(rate_cases = cases/7/n, rate_hosp = hosp/7/n, rate_death = death/7/n) 
+
+outcome_tab <- counts %>% 
+  filter(status != "PAR" & date > last_day - weeks(3) & date<=last_day - weeks(1)) %>%
+  mutate(complete_week = date <= last_day - weeks(2)) %>%
+  group_by(complete_week, status) %>%
   summarize(n = sum(n, na.rm = TRUE)/7,
             cases = sum(cases), hosp=sum(hosp), 
             death = sum(death),
@@ -482,7 +492,7 @@ proveedores <- bind_rows(
 
 save(proveedores, file=file.path(rda_path ,"proveedores.rda"))
 save(counts, file=file.path(rda_path ,"counts.rda"))
-save(summary_tab, outcome_tab, file=file.path(rda_path ,"tabs.rda"))
+save(summary_tab, outcome_tab, outcome_tab_details, file=file.path(rda_path ,"tabs.rda"))
 save(poblacion, poblacion_muni, file = file.path(rda_path ,"poblacion.rda"))
 save(daily_vax_counts, file = file.path(rda_path, "daily_vax_counts.rda"))
 save(daily_vax_counts_by_municipio, file = file.path(rda_path, "daily_vax_counts_by_municipio.rda"))

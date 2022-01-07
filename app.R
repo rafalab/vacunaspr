@@ -26,6 +26,13 @@ ui <- fluidPage(
               tabPanel("Resumen",
                        htmlOutput("fecha"),
                        htmlOutput("summary_1"),
+                       h4("Resumen de casos, hospitalizaciones y muertes"),
+                       radioButtons("summary_type", 
+                                    label = "",
+                                    choices = list("Sencillo" = "simple",
+                                                   "Detallado" = "detail"),
+                                    selected = "simple",
+                                    inline = TRUE),
                        htmlOutput("titulo_2"),
                        htmlOutput("summary_2"),
                        htmlOutput("titulo_3"),
@@ -200,19 +207,20 @@ server <- function(input, output, session) {
   
   output$titulo_2 <- renderText({
     load(file.path(rda_path, "dates.rda"))
-    paste("<h4>Resumen para semana acabando", 
-          format(last_day-weeks(2), "%B %d, %Y:"), "</h4>")
+    paste("<p>Semana acabando", 
+          format(last_day-weeks(2), "%B %d, %Y:"), "</p>")
     })
 
   output$titulo_3 <- renderText({
     load(file.path(rda_path, "dates.rda"))
-    paste("<h4>Resumen para semana acabando", 
-          format(last_day-weeks(1), "%B %d, %Y"), " (datos aun no completos):</h4>")})
+    paste("<p>Semana acabando", 
+          format(last_day-weeks(1), "%B %d, %Y"), " (datos aun no completos):</p>")})
   
   output$update <- renderText({
     paste0("<h4>Última actualización: ", format(the_stamp, "%B %d, %Y"), "</h4>")
   })
   
+ 
   output$summary_1 <- renderText({
     load(file.path(rda_path, "tabs.rda"))
     summary_tab %>% 
@@ -228,13 +236,20 @@ server <- function(input, output, session) {
   
   output$summary_2 <- renderText({
     load(file.path(rda_path, "tabs.rda"))
-    
-    make_outcome_tab(outcome_tab, TRUE)
+    if(input$summary_type == "detail"){
+      make_outcome_tab(outcome_tab_details, complete = TRUE, details = TRUE)
+    } else{
+      make_outcome_tab(outcome_tab, complete = TRUE, details = FALSE)
+    }
   })
   output$summary_3 <- renderText({
     load(file.path(rda_path, "tabs.rda"))
     
-    make_outcome_tab(outcome_tab, FALSE)
+    if(input$summary_type == "detail"){
+      make_outcome_tab(outcome_tab_details, complete = FALSE, details = TRUE)
+    } else{
+      make_outcome_tab(outcome_tab, complete = FALSE, details = FALSE)
+    }
   })
   
   
