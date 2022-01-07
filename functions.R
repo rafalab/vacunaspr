@@ -321,10 +321,10 @@ make_outcome_tab <- function(tab, complete = TRUE, details = FALSE){
                       align = c("c","c", rep("r", 8)))  %>%
       kableExtra::kable_styling() %>%
       kableExtra::column_spec(1, width = "12em") %>%
-        row_spec(which(tab$status=="No vacunados"), bold = T, color = "black", background = status_colors[["UNV"]]) %>%
-        row_spec(which(tab$status=="Parcial"), bold = T, color = "black", background = status_colors[["PAR"]]) %>%
-        row_spec(which(tab$status=="Vacunados sin booster"), bold = T, color = "black", background = status_colors[["VAX"]]) %>%
-        row_spec(which(tab$status=="Vacunados con booster"), bold = T, color = "black", background = status_colors[["BST"]])}
+        row_spec(which(tab$status=="No vacunados"), bold = FALSE, color = "black", background = status_colors[["UNV"]]) %>%
+        row_spec(which(tab$status=="Parcial"), bold = FALSE, color = "black", background = status_colors[["PAR"]]) %>%
+        row_spec(which(tab$status=="Vacunados sin booster"), bold = FALSE, color = "black", background = status_colors[["VAX"]]) %>%
+        row_spec(which(tab$status=="Vacunados con booster"), bold = FALSE, color = "black", background = status_colors[["BST"]])}
   else{
     tab <- tab %>% 
       filter(complete_week == complete) %>%
@@ -344,10 +344,10 @@ make_outcome_tab <- function(tab, complete = TRUE, details = FALSE){
                       align = c("c","c", rep("r", 7)))  %>%
       kableExtra::kable_styling() %>%
       kableExtra::column_spec(1, width = "12em") %>%
-      row_spec(which(tab$status=="No vacunados"), bold = T, color = "black", background = status_colors[["UNV"]]) %>%
-      row_spec(which(tab$status=="Parcial"), bold = T, color = "black", background = status_colors[["PAR"]]) %>%
-      row_spec(which(tab$status=="Vacunados sin booster"), bold = T, color = "black", background = status_colors[["VAX"]]) %>%
-      row_spec(which(tab$status=="Vacunados con booster"), bold = T, color = "black", background = status_colors[["BST"]])
+      row_spec(which(tab$status=="No vacunados"), bold = FALSE, color = "black", background = status_colors[["UNV"]]) %>%
+      row_spec(which(tab$status=="Parcial"), bold = FALSE, color = "black", background = status_colors[["PAR"]]) %>%
+      row_spec(which(tab$status=="Vacunados sin booster"), bold = FALSE, color = "black", background = status_colors[["VAX"]]) %>%
+      row_spec(which(tab$status=="Vacunados con booster"), bold = FALSE, color = "black", background = status_colors[["BST"]])
   }
 }
 
