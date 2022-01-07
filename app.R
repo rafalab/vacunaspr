@@ -240,6 +240,7 @@ server <- function(input, output, session) {
   
    output$muertes_plot <- renderPlot({
      load(file.path(rda_path, "counts.rda"))
+     load(file.path(rda_path, "dates.rda"))
      
      the_title <- case_when(
        input$event_type == "death" ~ "Tasa de mortalidad por estado de vacunación",
@@ -273,7 +274,7 @@ server <- function(input, output, session) {
        ggplot(aes(date, rate, color = manu, lty = Booster)) +
        geom_line(lwd = 1.25, alpha = 0.7) +
        labs(y="Tasa por día por 100,000", x="Fecha", title = the_title, 
-            caption = paste("Basado en media móvil de", the_k,"días")) +
+            caption = paste("Basado en media móvil de", the_k,"días.\nArea gris contiene datos incompletos.")) +
        scale_color_manual(
          labels = c(UNV=manu_labels[["UNV"]], MOD=manu_labels[["MOD"]], PFR=manu_labels[["PFR"]],
                     JSN=manu_labels[["JSN"]]),
@@ -285,6 +286,13 @@ server <- function(input, output, session) {
      
      if(input$event_agerange == "facet") p <- p + facet_wrap(~ageRange)
      if(input$event_scale == "log") p <- p + scale_y_continuous(trans = "log2")
+     
+     if(input$event_range[2]>last_day-days(14)){
+       p <- p + 
+          geom_ribbon(aes(xmin = pmax(last_day-days(14), input$event_range[1]),
+                          xmax = pmin(last_day, input$event_range[2])), alpha =0.25,
+                      color = NA, show.legend = FALSE)
+     }
      
      return(p)
 
