@@ -27,6 +27,7 @@ ui <- fluidPage(
                        htmlOutput("fecha"),
                        htmlOutput("summary_1"),
                        h4("Resumen de casos, hospitalizaciones y muertes"),
+                       p("Los tamaños de los groups son diferentes por lo cual no es informativo comparar totales sino las tasas (por 100K por día). Los totales no incluyen personas que se dado positivo en los últimos 90 días."),
                        radioButtons("summary_type", 
                                     label = "",
                                     choices = list("Sencillo" = "simple",
@@ -263,7 +264,7 @@ server <- function(input, output, session) {
        input$event_type == "cases" ~ "Casos por 100,000 por día por estado de vacunación")
      
      if(input$event_agerange %in% c("all", "facet")){
-       counts <- filter(counts, ageRange != "0-4" & ageRange !="5-11") %>%
+       counts <- filter(counts, ageRange != "0-4") %>%
          mutate(ageRange = droplevels(ageRange))} else{
            counts <- filter(counts, ageRange == input$event_agerange)
      }
