@@ -26,8 +26,17 @@ ui <- fluidPage(
               tabPanel("Resumen",
                        htmlOutput("fecha"),
                        htmlOutput("summary_1"),
-                       hr(),
-                       htmlOutput("summary_2")
+                       h4("Resumen de casos, hospitalizaciones y muertes"),
+                       radioButtons("summary_type", 
+                                    label = "",
+                                    choices = list("Sencillo" = "simple",
+                                                   "Detallado" = "detail"),
+                                    selected = "simple",
+                                    inline = TRUE),
+                       htmlOutput("titulo_2"),
+                       htmlOutput("summary_2"),
+                       htmlOutput("titulo_3"),
+                       htmlOutput("summary_3")
               ),
               tabPanel("Eventos",
                        sidebarLayout(
@@ -40,12 +49,12 @@ ui <- fluidPage(
                                        selected = "death"),
                            dateRangeInput("event_range", "Periodo", 
                                           start = last_day - days(240),
-                                          end = last_day,
+                                          end = last_day_counts,
                                           format = "M-dd-yyyy",
                                           language = "es",
                                           width = "100%",
                                           min = first_day,
-                                          max = last_day),
+                                          max = last_day_counts),
                            selectInput("event_agerange",
                                        "Grupo de Edad",
                                        choice = c("Agregados" = "all",
@@ -189,21 +198,29 @@ ui <- fluidPage(
   htmlOutput("update"),
 )
               
-
-
-
-
 server <- function(input, output, session) {
     
   output$fecha <- renderText({
-  load(file.path(rda_path, "dates.rda"))
+    load(file.path(rda_path, "dates.rda"))
     paste0("<h4>Datos para ", 
            format(last_day, "%B %d, %Y:"), "</h4>")})
+  
+  output$titulo_2 <- renderText({
+    load(file.path(rda_path, "dates.rda"))
+    paste("<p>Semana acabando", 
+          format(last_day-weeks(2), "%B %d, %Y:"), "</p>")
+    })
+
+  output$titulo_3 <- renderText({
+    load(file.path(rda_path, "dates.rda"))
+    paste("<p>Semana acabando", 
+          format(last_day-weeks(1), "%B %d, %Y"), " (datos parciales):</p>")})
   
   output$update <- renderText({
     paste0("<h4>Última actualización: ", format(the_stamp, "%B %d, %Y"), "</h4>")
   })
   
+ 
   output$summary_1 <- renderText({
     load(file.path(rda_path, "tabs.rda"))
     summary_tab %>% 
@@ -219,28 +236,26 @@ server <- function(input, output, session) {
   
   output$summary_2 <- renderText({
     load(file.path(rda_path, "tabs.rda"))
-  
-    outcome_tab %>% 
-      mutate(status = recode(status, UNV = "No vacunados", PAR= "Parcial", VAX="Vacunados sin booster", BST = "Vacunados con booster")) %>%
-      mutate(manu = recode(as.character(manu), UNV = "", MOD = "Moderna", 
-                           PFR = "Pfizer", JSN = "J & J")) %>%
-      mutate(n = make_pretty(round(n)),
-             cases = make_pretty(cases), 
-             rate_cases =  digits(rate_cases * 10^5/365, 1),
-             hosp = make_pretty(hosp), 
-             rate_hosp =  digits(rate_hosp * 10^5/365, 1),
-             death = make_pretty(death), 
-             rate_death =  digits(rate_death * 10^5/365, 2), 
-             total = make_pretty(round(total))) %>%
-      select(status, manu, total, n, cases, rate_cases, hosp,rate_hosp, death, rate_death) %>%
-      kableExtra::kbl(col.names = c("Vacunación", "Tipo de vacuna", "Total", "Años-Persona", "Casos", "Casos por 100,000 por día", "Hosp", "Hosp por 100,000 por día", "Muertes","Muertes por 100,000 por día"),
-                      align = c("c","c", rep("r", 8)))  %>%
-      kableExtra::kable_styling() %>%
-      kableExtra::column_spec(1, width = "12em")
+    if(input$summary_type == "detail"){
+      make_outcome_tab(outcome_tab_details, complete = TRUE, details = TRUE)
+    } else{
+      make_outcome_tab(outcome_tab, complete = TRUE, details = FALSE)
+    }
   })
+  output$summary_3 <- renderText({
+    load(file.path(rda_path, "tabs.rda"))
+    
+    if(input$summary_type == "detail"){
+      make_outcome_tab(outcome_tab_details, complete = FALSE, details = TRUE)
+    } else{
+      make_outcome_tab(outcome_tab, complete = FALSE, details = FALSE)
+    }
+  })
+  
   
    output$muertes_plot <- renderPlot({
      load(file.path(rda_path, "counts.rda"))
+     load(file.path(rda_path, "dates.rda"))
      
      the_title <- case_when(
        input$event_type == "death" ~ "Tasa de mortalidad por estado de vacunación",
@@ -258,7 +273,7 @@ server <- function(input, output, session) {
      the_k <- case_when(input$event_type == "death" ~ 60,
                         input$event_type == "hosp" ~ 30,
                         input$event_type == "cases" ~ 14)
-     p <- counts %>% 
+     tmp <- counts %>% 
        filter(status %in% c("VAX", "UNV", "BST")) %>%
        filter(!(status == "BST" & manu == "JSN")) %>%
        mutate(outcome = !!sym(input$event_type)) %>%
@@ -270,11 +285,12 @@ server <- function(input, output, session) {
        ungroup() %>%
        filter(date >= input$event_range[1] & date <= input$event_range[2]) %>%
        filter(denom > 10000) %>%
-       mutate(Booster = factor(ifelse(status != "BST",  "Sin", "Con"), levels = c("Sin", "Con"))) %>%
-       ggplot(aes(date, rate, color = manu, lty = Booster)) +
+       mutate(Booster = factor(ifelse(status != "BST",  "Sin", "Con"), levels = c("Sin", "Con"))) 
+     
+       p <- tmp %>% ggplot(aes(date, rate, color = manu, lty = Booster)) +
        geom_line(lwd = 1.25, alpha = 0.7) +
        labs(y="Tasa por día por 100,000", x="Fecha", title = the_title, 
-            caption = paste("Basado en media móvil de", the_k,"días")) +
+            caption = paste("Basado en media móvil de", the_k,"días.\nArea gris contiene datos incompletos.")) +
        scale_color_manual(
          labels = c(UNV=manu_labels[["UNV"]], MOD=manu_labels[["MOD"]], PFR=manu_labels[["PFR"]],
                     JSN=manu_labels[["JSN"]]),
@@ -286,6 +302,15 @@ server <- function(input, output, session) {
      
      if(input$event_agerange == "facet") p <- p + facet_wrap(~ageRange)
      if(input$event_scale == "log") p <- p + scale_y_continuous(trans = "log2")
+     
+     if(input$event_range[2]>last_day-days(14)){
+       p <- p + 
+          annotate("rect", 
+                   xmin = pmax(last_day-days(14), input$event_range[1]),
+                   xmax = pmin(last_day, input$event_range[2]),
+                   ymin = min(tmp$rate, na.rm = TRUE),
+                   ymax = max(tmp$rate, na.rm = TRUE), alpha =0.2)
+     }
      
      return(p)
 
