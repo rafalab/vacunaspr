@@ -495,17 +495,23 @@ manu_info <- data.table(
   days_from_1_to_2=c(21, 28, 0),
   days_from_2_to_boost=c(183, 183, 61)
 )
+rownames(manu_info) <- manu_info$manu
 manu_info
 
 
 dat_seguimiento <- dat_vax[!is.na(date_1)]
-dat_seguimiento[, vax_date_sched := date_1 + manu_info$days_from_1_to_2[manu_1] + days(14)]
-dat_seguimiento[, booster_date_sched := vax_date + manu_info$days_from_2_to_boost[manu_1]]
+dat_seguimiento[, vax_date_sched := date_1 + manu_info$days_from_1_to_2[match(manu_1, manu_info$manu)] + days(14)]
+dat_seguimiento[, booster_date_sched := vax_date + manu_info$days_from_2_to_boost[match(manu_1, manu_info$manu)]]
 
 dat_seguimiento[, patient_row := 1:nrow(dat_seguimiento)]
 
 # Print example
-dat_seguimiento[, .(date_1, vax_date_sched, vax_date, booster_date_sched, booster_date)]
+dat_seguimiento[, .(ageRange_2, date_1, vax_date_sched, vax_date, booster_date_sched, booster_date)]
+
+dat_seguimiento[(booster_date - booster_date_sched) > 200,
+                .(ageRange_2, manu_1, date_1, vax_date_sched, vax_date, booster_date_sched, booster_date)] %>%
+    .[order(booster_date_sched - booster_date),] 
+  
 
 seguimiento_intervalos <- data.table(
   name=as.factor(c('1A-VS', 'VS-VA', 'VA-BS', 'BS-BA')),
@@ -521,7 +527,8 @@ melt(dat_seguimiento, measure=list(
 ) %>%
 .[order(patient_row, interval)] %>%
   .[, interval := seguimiento_intervalos$name[interval]] %>%
-  .[!(is.na(interval_start) & is.na(interval_end)),]
+  .[!(is.na(interval_start) & is.na(interval_end)),] %>%
+.[, interval_length := interval_end - interval_start]
 
 dat_seguimiento_onedose <-
 dat_seguimiento_melted[interval == "1A-VS",] %>%
@@ -642,6 +649,37 @@ ggplot(aes(x = date)) +
   ggtitle("Población con vacunación COVID-19 up-to-date\nen Puerto Rico") 
 
 ggsave('vacunados_up-to-date.png',dpi=300)
+
+# Interval lengths between 1st and vaccinated status
+
+days_betw_vs_va <-
+dat_seguimiento_melted[(interval == "VS-VA") & 
+                       !is.na(interval_length) & 
+                        (manu_1 != "JSN"),] %>%
+  .[(-10 < interval_length) & (interval_length < 20)] %>%
+  .[, interval_length] %>% 
+  as.numeric()
+hist(days_betw_vs_va, prob=T,
+     main="Retraso recibiendo segunda dosis",
+     xlab="Dias desde fecha pronosticada", ylab= "PDF", )
+#lines(density(days_betw_vs_va))
+#View(dat_vax[c(2733996)])
+
+
+days_betw_bs_ba <-
+  dat_seguimiento_melted[(interval == "BS-BA") & 
+                           !is.na(interval_length)
+                           ,] %>%
+  #.[(-10 < interval_length) & (interval_length < 40)] %>%
+  #.[, interval_length] %>% 
+  .[,interval_length := as.numeric(interval_length)]
+hist(days_betw_bs_ba[,interval_length], prob=T,
+     main="Retraso recibiendo dosis de refuerzo",
+     xlab="Dias desde fecha pronosticada", ylab= "PDF", )
+lines(density(days_betw_bs_ba[,interval_length]))
+
+days_betw_bs_ba[,.(Mean_booster_delay=mean(interval_length), Sd=sd(interval_length)),.(manu_1 %in% c("PFR","MOD"))]
+
 
 save(proveedores, file=file.path(rda_path ,"proveedores.rda"))
 save(counts, file=file.path(rda_path ,"counts.rda"))
