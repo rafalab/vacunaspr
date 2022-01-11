@@ -504,7 +504,9 @@ server <- function(input, output, session) {
       mutate(o = ifelse(proveedor == "Otros", -Inf, total)) %>%  
       arrange(desc(o)) %>%
       select(-o) %>%
-      mutate(total = make_pretty(total), entradas_esta_semana = make_pretty(entradas_esta_semana)) %>%
+      mutate(total = make_pretty(total), entradas_esta_semana = make_pretty(entradas_esta_semana),
+             rezago_esta_semana = ifelse(is.nan(rezago_esta_semana), 
+                                                  "No se reportaron entradas", rezago_esta_semana)) %>%
       select(proveedor, total, rezago, entradas_esta_semana, rezago_esta_semana) %>%
       setNames(c("Proveedor", "Vacunas administradas", "Rezago medio (días)", "Entradas última semana","Rezago última semana")) %>% 
       kableExtra::kbl(align = c("l","r", "r","r", "r", "r"))  %>% 
