@@ -582,6 +582,7 @@ dat_seguimiento_bydate <-
          booster_deficit_cumu = cumsum(booster_deficit),
          ontime_cumu = cumsum(ontime)) %>%
   mutate_if(is.numeric, list(~ ./pr_pop)) %>%
+  mutate_at(vars(ends_with('_cumu')), list(ma7 = ~as.numeric(stats::filter(., rep(1/7, 7), side = 1)))) %>%
   filter(date <= last_day)
 
 dat_seguimiento_plotting <- dat_seguimiento_bydate %>%
@@ -594,10 +595,10 @@ dat_seguimiento_plotting %>%
 ggplot(aes(x = date, y = value, colour = variable)) + 
   theme_bw() +
   geom_ribbon(data=dat_seguimiento_bydate, 
-              aes(x=date, ymin=complete_cumu,ymax=complete_exp_cumu), fill="darkred", alpha=0.7,
+              aes(x=date, ymin=complete_cumu,ymax=complete_exp_cumu), fill="darksalmon", alpha=0.7,
               inherit.aes = F) +
   geom_ribbon(data=dat_seguimiento_bydate,
-              aes(x=date, ymin=booster_cumu,ymax=booster_exp_cumu), fill="darkorange", alpha=0.7,
+              aes(x=date, ymin=booster_cumu,ymax=booster_exp_cumu), fill="darkred", alpha=0.7,
               inherit.aes = F) +
   geom_line(size=0.5) +
   # geom_line(aes(y = onedose_cumu, colour = "Una")) + 
@@ -607,10 +608,10 @@ ggplot(aes(x = date, y = value, colour = variable)) +
   scale_y_continuous(labels = scales::percent_format(accuracy = 1), limits=c(0,1)) +
   scale_color_manual(name = "Dosis", 
                        values = c("onedose_cumu" = "black",
-                                  "complete_exp_cumu" = "darkred",
+                                  "complete_exp_cumu" = "darksalmon",
                                   "complete_cumu" = "black",
                                   "booster_cumu" = "black",
-                                  "booster_exp_cumu" = "darkorange"
+                                  "booster_exp_cumu" = "darkred"
                                   ),
                        labels = c("onedose_cumu" = "Solo una",
                                   "complete_exp_cumu" = "Completa (anticipada)",
@@ -632,21 +633,29 @@ ggsave('seguimiento.png',dpi=300)
 dat_seguimiento_bydate %>%
 ggplot(aes(x = date)) + 
   theme_bw() +
-  geom_ribbon(aes(ymin=ontime_cumu,
-                  ymax=ontime_cumu + booster_deficit_cumu,
-                  fill='booster'),  alpha=0.7,
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) +
+  geom_ribbon(aes(ymin=ontime_cumu_ma7,
+                  ymax=ontime_cumu_ma7 + booster_deficit_cumu_ma7,
+                  fill='booster'),  alpha=0.4,
               inherit.aes = T) +
-  geom_ribbon(aes(ymin=ontime_cumu+booster_deficit_cumu,
-                  ymax=ontime_cumu + booster_deficit_cumu+complete_deficit_cumu,
-                  fill='complete'), alpha=0.7,
+  geom_ribbon(aes(ymin=ontime_cumu_ma7+booster_deficit_cumu_ma7,
+                  ymax=ontime_cumu_ma7 + booster_deficit_cumu_ma7+complete_deficit_cumu_ma7,
+                  fill='complete'), alpha=0.4,
               inherit.aes = T) +
-  geom_line(aes(y = ontime_cumu), size=1) +
+  geom_line(aes(y = ontime_cumu_ma7 + booster_deficit_cumu_ma7 +complete_deficit_cumu_ma7,
+                linetype="Idealmente, todos"),
+                                  size=1.0, colour="darkblue", alpha=0.4) +
+  geom_line(aes(y = ontime_cumu_ma7, linetype="En realidad, pocos"),
+                                  size=1.5, colour="darkblue") +
   scale_y_continuous(labels = scales::percent_format(accuracy = 1), limits=c(0,1)) +
-  scale_fill_manual(name='Aun sin recibir:',labels=c('Booster', 'Segunda dosis'), values=c('darkorange', 'red'),
-                    guide = guide_legend(reverse = TRUE)) +
+  scale_linetype(guide = guide_legend(reverse = T, order=1)) +
+  scale_fill_manual(name='Aquellos aun sin recibir:',labels=c('Booster', 'Segunda dosis'), values=c('darkred', 'darksalmon'),
+                    guide = guide_legend(reverse = TRUE, order=2)) +
+  
+  labs(linetype="¿Cuantos?") +
   xlab("Fecha") +
   ylab("Población") +
-  ggtitle("Población con vacunación COVID-19 up-to-date\nen Puerto Rico") 
+  ggtitle("¿Cuanta gente tiene sus vacunas COVID-19 al día?") 
 
 ggsave('vacunados_up-to-date.png',dpi=300)
 
