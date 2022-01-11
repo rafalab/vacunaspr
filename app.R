@@ -27,7 +27,7 @@ ui <- fluidPage(
                        htmlOutput("fecha"),
                        htmlOutput("summary_1"),
                        h4("Resumen de casos, hospitalizaciones y muertes"),
-                       p("Los tamaños de los groups son diferentes por lo cual no es informativo comparar totales sino las tasas (por 100K por día). Los totales no incluyen personas que han dado positivo a una prueba diagnóstica en los últimos 90 días."),
+                       p("Los tamaños de los grupos son diferentes por lo cual no es informativo comparar totales sino las tasas (por 100K por día). Los totales no incluyen personas que han dado positivo a una prueba diagnóstica en los últimos 90 días."),
                        radioButtons("summary_type", 
                                     label = "",
                                     choices = list("Sencillo" = "simple",
@@ -504,7 +504,9 @@ server <- function(input, output, session) {
       mutate(o = ifelse(proveedor == "Otros", -Inf, total)) %>%  
       arrange(desc(o)) %>%
       select(-o) %>%
-      mutate(total = make_pretty(total), entradas_esta_semana = make_pretty(entradas_esta_semana)) %>%
+      mutate(total = make_pretty(total), entradas_esta_semana = make_pretty(entradas_esta_semana),
+             rezago_esta_semana = ifelse(is.nan(rezago_esta_semana), 
+                                                  "No se reportaron entradas", rezago_esta_semana)) %>%
       select(proveedor, total, rezago, entradas_esta_semana, rezago_esta_semana) %>%
       setNames(c("Proveedor", "Vacunas administradas", "Rezago medio (días)", "Entradas última semana","Rezago última semana")) %>% 
       kableExtra::kbl(align = c("l","r", "r","r", "r", "r"))  %>% 

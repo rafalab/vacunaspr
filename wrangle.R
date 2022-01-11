@@ -538,7 +538,7 @@ the_colnames <- c("date", "manu", "insert_date", "proveedor", "ageRange")
 proveedores <- bind_rows(
   mutate(dose = "Primera", setNames(select(dat_vax, contains("_1")), the_colnames)),
   mutate(dose = "Segunda", setNames(select(dat_vax, contains("_2")), the_colnames)),
-  mutate(dose = "Booster", setNames(select(dat_vax, contains("booster")), the_colnames))) %>%
+  mutate(dose = "Booster", setNames(select(dat_vax, contains("_3")), the_colnames))) %>%
   mutate(diff = as.numeric(insert_date) - as.numeric(date)) %>%
   filter(!is.na(proveedor) & !(dose=="Segunada" & manu == "JSN")) %>%
   group_by(proveedor, dose, manu, ageRange) %>%
@@ -546,7 +546,7 @@ proveedores <- bind_rows(
             rezago = mean(diff),
             entradas_esta_semana = sum(insert_date >= today() - weeks(1)),
             rezago_esta_semana = mean(diff[insert_date >= today() - weeks(1)]),
-            .groups = "drop")
+            .groups = "drop") 
 
 
 
