@@ -60,7 +60,7 @@ dat_vax[!is.na(booster_date) & is.na(vax_date),
 
 
 ## last data without needing a booster
-dat_vax[is.na(booster_date) & !is.na(vax_date) & manu_2 != "JSN", last_immune_date := date_2 + days(180)]
+dat_vax[is.na(booster_date) & !is.na(vax_date) & manu_2 != "JSN", last_immune_date := date_2 + days(150)]
 dat_vax[is.na(booster_date) & !is.na(vax_date) & manu_2 == "JSN", last_immune_date := date_1 + days(60)]
 
 
