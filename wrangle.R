@@ -562,6 +562,8 @@ dat_seguimiento_booster_expfill <-
   count(anticipated_end) %>%
   rename(date = anticipated_end, booster_exp = n)
 
+cases_by_date <- counts[,.(cases=sum(cases)), .(date)]
+
 dat_seguimiento_bydate <-
   merge(dat_seguimiento_onedose, dat_seguimiento_complete, all=T, on='date') %>%
   merge(., dat_seguimiento_booster, all=T, on='date') %>%
@@ -582,7 +584,8 @@ dat_seguimiento_bydate <-
          booster_deficit_cumu = cumsum(booster_deficit),
          ontime_cumu = cumsum(ontime)) %>%
   mutate_if(is.numeric, list(~ ./pr_pop)) %>%
-  mutate_at(vars(ends_with('_cumu')), list(ma7 = ~as.numeric(stats::filter(., rep(1/7, 7), side = 1)))) %>%
+  left_join(cases_by_date, by="date") %>%
+  mutate_at(vars(ends_with('_cumu') | contains("cases")), list(ma7 = ~as.numeric(stats::filter(., rep(1/7, 7), side = 1)))) %>%
   filter(date <= last_day)
 
 dat_seguimiento_plotting <- dat_seguimiento_bydate %>%
@@ -630,10 +633,13 @@ ggplot(aes(x = date, y = value, colour = variable)) +
   
 ggsave('seguimiento.png',dpi=300)
 
+sec_axis_scale <- 2000
+
 dat_seguimiento_bydate %>%
 ggplot(aes(x = date)) + 
   theme_bw() +
   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) +
+  geom_bar(aes(y = cases_ma7 / sec_axis_scale), colour="gray", stat="identity") +
   geom_ribbon(aes(ymin=ontime_cumu_ma7,
                   ymax=ontime_cumu_ma7 + booster_deficit_cumu_ma7,
                   fill='booster'),  alpha=0.4,
@@ -647,7 +653,12 @@ ggplot(aes(x = date)) +
                                   size=1.0, colour="darkblue", alpha=0.4) +
   geom_line(aes(y = ontime_cumu_ma7, linetype="En realidad, pocos"),
                                   size=1.5, colour="darkblue") +
-  scale_y_continuous(labels = scales::percent_format(accuracy = 1), limits=c(0,1)) +
+  
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1),
+                     limits=c(0,1),
+                     oob = rescale_none,
+                     sec.axis = sec_axis(~ . *sec_axis_scale, name = "Promedio casos nuevos")
+                     ) +
   scale_linetype(guide = guide_legend(reverse = T, order=1)) +
   scale_fill_manual(name='Aquellos aun sin recibir:',labels=c('Booster', 'Segunda dosis'), values=c('darkred', 'darksalmon'),
                     guide = guide_legend(reverse = TRUE, order=2)) +
@@ -688,6 +699,7 @@ hist(days_betw_bs_ba[,interval_length], prob=T,
 lines(density(days_betw_bs_ba[,interval_length]))
 
 days_betw_bs_ba[,.(Mean_booster_delay=mean(interval_length), Sd=sd(interval_length)),.(manu_1 %in% c("PFR","MOD"))]
+
 
 
 save(proveedores, file=file.path(rda_path ,"proveedores.rda"))
