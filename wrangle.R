@@ -347,6 +347,7 @@ dat_cases[manu_1 == "JSN",
           c("vax_date", "booster_date", "manu_2", "booster_manu") := .(date_1, date_2, manu_1, manu_2)] 
 dat_cases$manu <- factor(replace_na(as.character(dat_cases$manu_1), "UNV"), levels = manu_levels)
 
+# Ajustar para incluir 14 dias para dosis tomar efecto
 dat_cases[!is.na(vax_date), vax_date := vax_date + days(14)]
 dat_cases[!is.na(booster_date), booster_date := booster_date + days(14)]
 
@@ -507,11 +508,22 @@ dat_seguimiento[, patient_row := 1:nrow(dat_seguimiento)]
 
 # Print example
 dat_seguimiento[, .(ageRange_2, date_1, vax_date_sched, vax_date, booster_date_sched, booster_date)]
+dat_seguimiento[manu_1 == "JSN", .(manu_1, date_1, date_2, vax_date, booster_date)]
 
 dat_seguimiento[(booster_date - booster_date_sched) > 200,
                 .(ageRange_2, manu_1, date_1, vax_date_sched, vax_date, booster_date_sched, booster_date)] %>%
     .[order(booster_date_sched - booster_date),] 
-  
+
+
+dat_administradas <-
+dat_seguimiento[, .(manu_1, date_1, vax_date, booster_date)] %>%
+  melt(id=1, variable.name="date_var", value.name="date") %>%
+  .[order(date,date_var,manu_1), .(total=.N), .(date, date_var, manu_1)] %>%
+  .[!is.na(date),] %>% # No NA dates
+  .[!((date_var=="vax_date")&(manu_1=="JSN"))] # Redundant incluir vax_date para JSN (ya estan en date_1)
+dat_administradas[(date_var != "date_1"), date := date - days(14)]
+administradas_by_date <- dat_administradas[, .(administradas=sum(total)), .(date)]
+
 
 seguimiento_intervalos <- data.table(
   name=as.factor(c('1A-VS', 'VS-VA', 'VA-BS', 'BS-BA')),
@@ -585,7 +597,8 @@ dat_seguimiento_bydate <-
          ontime_cumu = cumsum(ontime)) %>%
   mutate_if(is.numeric, list(~ ./pr_pop)) %>%
   left_join(cases_by_date, by="date") %>%
-  mutate_at(vars(ends_with('_cumu') | contains("cases")), list(ma7 = ~as.numeric(stats::filter(., rep(1/7, 7), side = 1)))) %>%
+  left_join(administradas_by_date, by="date") %>%
+  mutate_at(vars(ends_with('_cumu') | contains("cases") | contains("administradas")), list(ma7 = ~as.numeric(stats::filter(., rep(1/7, 7), side = 1)))) %>%
   filter(date <= last_day)
 
 dat_seguimiento_plotting <- dat_seguimiento_bydate %>%
@@ -699,6 +712,33 @@ hist(days_betw_bs_ba[,interval_length], prob=T,
 lines(density(days_betw_bs_ba[,interval_length]))
 
 days_betw_bs_ba[,.(Mean_booster_delay=mean(interval_length), Sd=sd(interval_length)),.(manu_1 %in% c("PFR","MOD"))]
+
+# Casos vs vac admin
+
+vacunas_rescale <- 50
+
+dat_seguimiento_bydate %>%
+  ggplot(aes(x = date)) + 
+  theme_bw() +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) +
+  geom_bar(aes(y = cases_ma7), colour=alpha("black", 1), stat="identity") +
+  geom_bar(aes(y = administradas_ma7 / vacunas_rescale), colour=alpha("blue", 0.2), stat="identity") +
+  
+  
+  scale_y_continuous(
+                     #labels = scales::percent_format(accuracy = 1),
+                     limits=c(0,1500),
+                     oob = rescale_none,
+                     sec.axis = sec_axis(~ . *vacunas_rescale, name = "Vacunas administradas")
+  ) +
+  #scale_linetype(guide = guide_legend(reverse = T, order=1)) +
+  # scale_fill_manual(name='Aquellos aun sin recibir:',labels=c('Booster', 'Segunda dosis'), values=c('darkred', 'darksalmon'),
+                    # guide = guide_legend(reverse = TRUE, order=2)) +
+  
+  # labs(linetype="¿Cuantos?") +
+  xlab("Fecha de muestra o administración") +
+  ylab("Casos") +
+  ggtitle("Casos y vacunas")
 
 
 
