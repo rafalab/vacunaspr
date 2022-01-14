@@ -60,7 +60,7 @@ dat_vax[!is.na(booster_date) & is.na(vax_date),
 
 
 ## last data without needing a booster
-dat_vax[is.na(booster_date) & !is.na(vax_date) & manu_2 != "JSN", last_immune_date := date_2 + days(180)]
+dat_vax[is.na(booster_date) & !is.na(vax_date) & manu_2 != "JSN", last_immune_date := date_2 + days(150)]
 dat_vax[is.na(booster_date) & !is.na(vax_date) & manu_2 == "JSN", last_immune_date := date_1 + days(60)]
 
 
@@ -239,7 +239,7 @@ poblacion <- rbind(counts_booster_age_gender_manu[,status:="BST"],
 poblacion$status <- factor(poblacion$status, levels = c("UNV", "PAR", "VAX", "BST"))
 poblacion$ageRange <- factor(poblacion$ageRange, levels = age_levels)
 #poblacion %>%  filter(status == "PAR") %>% ggplot(aes(date, n, color = gender)) + geom_line() + facet_grid(manu~ageRange) 
-
+poblacion[gender=="O" & status == "UNV", n := 0]
 
 ### by municipio
 unvax <- counts_onedose_age_gender_manu_muni[ , .(total = sum(n)), 
@@ -262,6 +262,7 @@ poblacion_muni$status <- factor(poblacion_muni$status, levels = c("UNV", "PAR", 
 poblacion_muni$ageRange <- factor(poblacion_muni$ageRange, levels = age_levels)
 poblacion_muni$municipio <- 
   factor(poblacion_muni$municipio, levels = muni_levels)
+poblacion_muni[gender=="O" & status == "UNV", n := 0]
 
 ### PIRAMIDE
 tab <- poblacion %>% 
@@ -391,10 +392,22 @@ counts[is.na(counts)] <- 0
 counts$manu <- factor(counts$manu, levels = manu_levels)
 counts$status <- factor(counts$status,  levels = c("UNV", "PAR", "VAX", "BST"))
 counts$ageRange <- factor(counts$ageRange, levels = age_levels)
+counts <- counts[order(date), ]
 
+## 90 day total
+sum90 <- function(y, k = 90) as.numeric(stats::filter(y, c(0, rep(1, k)), side = 1))
+recently_infected <- copy(counts)
+recently_infected <- recently_infected[,c("date", "ageRange", "gender", "status", "manu", "cases")]
+recently_infected[, cases := sum90(cases), keyby = .(ageRange, gender, manu, status)]
+setnames(recently_infected, "cases", "infected")
+#check:
+#recently_infected %>% ggplot(aes(date, infected, color = paste(status,manu,sep=":"))) + geom_line() + facet_grid(gender~ageRange)
+#counts %>% ggplot(aes(date, n, color = paste(status,manu,sep=":"))) + geom_line() + facet_grid(gender~ageRange)
+counts <- merge(counts, recently_infected, by = c("date", "ageRange", "gender",  "status", "manu"), all.x = TRUE)
+counts[, n:= n - infected]
+counts <- counts[,-"infected"]
 
 ### Summary tab
-
 primera <- sum(!is.na(dat_vax$date_1))
 primera_prop <- primera/pr_pop
 
@@ -446,25 +459,72 @@ summary_tab <- data.frame(names = c("Vacunas administradas",
                   porciento = c(NA, primera_prop, completa_prop,  the_immune_prop, booster_prop, lost_prop,  pediatric_primera_prop, pediatric_completa_prop),
                   tasas = c(administradas_tasa, tasas$onedose, tasas$full, tasas$immune, tasas$booster, tasas$lost, tasas_ped$onedose, tasas_ped$full))
 
-outcome_tab_details <- counts %>% 
-  filter(date>last_day - weeks(3) & date<=last_day - weeks(1)) %>%
-  mutate(complete_week = date <= last_day - weeks(2)) %>%
-  group_by(complete_week, status, manu) %>%
-  summarize(n = sum(n, na.rm = TRUE)/7,
-            cases = sum(cases), hosp=sum(hosp), 
-            death = sum(death),
-            .groups = "drop") %>%
-  mutate(rate_cases = cases/7/n, rate_hosp = hosp/7/n, rate_death = death/7/n) 
+## Compute cases, hosp and death rates
+## Include other genders in totals
+tmp <- counts %>% 
+  filter(!ageRange %in% c("0-4", "5-11", "12-17") &
+           date > last_day - weeks(3) & date<=last_day - weeks(1)) %>%
+  mutate(ageRange = droplevels(ageRange)) %>%
+  mutate(ageRange = fct_collapse(ageRange, 
+                                 "18-39" = c("18-29", "30-39"),
+                                 "40-59" = c("40-49", "50-59"),
+                                 "60+" = c("60-69", "70-79", "80+"))) 
 
-outcome_tab <- counts %>% 
-  filter(status != "PAR" & date > last_day - weeks(3) & date<=last_day - weeks(1)) %>%
-  mutate(complete_week = date <= last_day - weeks(2)) %>%
-  group_by(complete_week, status) %>%
-  summarize(n = sum(n, na.rm = TRUE)/7,
+outcome_tab_totals <- tmp %>%
+  mutate(complete_week = date <= last_day - weeks(2))%>%
+  group_by(complete_week, ageRange, status, manu) %>%
+  summarize(cases = sum(cases), hosp=sum(hosp), 
+            death = sum(death),
+            .groups = "drop")  
+
+## compute rates only on M and F as we don't have unvax populations for others
+outcome_tab_rates <- tmp %>%
+  filter(gender != "O") %>%
+  group_by(date, ageRange, status, manu) %>%
+  summarize(n = sum(n), cases = sum(cases), hosp=sum(hosp), death = sum(death),
+            .groups = "drop")  %>%
+  mutate(complete_week = date <= last_day - weeks(2))%>%
+  group_by(complete_week, ageRange, status, manu) %>%
+  summarize(n = mean(n), 
             cases = sum(cases), hosp=sum(hosp), 
             death = sum(death),
             .groups = "drop") %>%
-  mutate(rate_cases = cases/7/n, rate_hosp = hosp/7/n, rate_death = death/7/n) 
+  mutate(cases = cases/7/n, hosp = hosp/7/n, death = death/7/n)  
+
+outcome_tab_details <- left_join(outcome_tab_totals, outcome_tab_rates, 
+                                 by = c("complete_week", "ageRange", "status", "manu"), 
+                                 suffix = c("", "_rate")) %>%
+  arrange(desc(complete_week), desc(ageRange)) %>%
+  filter(!(status == "BST" & manu == "JSN"))
+
+
+tmp <- filter(tmp, status != "PAR") 
+
+outcome_tab_totals <- tmp %>%
+  mutate(complete_week = date <= last_day - weeks(2))%>%
+  group_by(complete_week, ageRange, status) %>%
+  summarize(cases = sum(cases), hosp=sum(hosp), 
+            death = sum(death),
+            .groups = "drop")  
+
+## compute rates only on M and F as we don't have unvax populations for others
+outcome_tab_rates <- tmp %>%
+  filter(gender != "O") %>%
+  group_by(date, ageRange, status) %>%
+  summarize(n = sum(n), cases = sum(cases), hosp=sum(hosp), death = sum(death),
+            .groups = "drop")  %>%
+  mutate(complete_week = date <= last_day - weeks(2))%>%
+  group_by(complete_week, ageRange, status) %>%
+  summarize(n = mean(n), 
+            cases = sum(cases), hosp=sum(hosp), 
+            death = sum(death),
+            .groups = "drop") %>%
+  mutate(cases = cases/7/n, hosp = hosp/7/n, death = death/7/n)  
+  
+outcome_tab <- left_join(outcome_tab_totals, outcome_tab_rates, 
+                         by = c("complete_week", "ageRange", "status"), 
+                         suffix = c("", "_rate")) %>%
+  arrange(desc(complete_week), desc(ageRange))
 
 # totals <- poblacion %>% 
 #   filter(date == last_day) %>%
@@ -479,7 +539,7 @@ the_colnames <- c("date", "manu", "insert_date", "proveedor", "ageRange")
 proveedores <- bind_rows(
   mutate(dose = "Primera", setNames(select(dat_vax, contains("_1")), the_colnames)),
   mutate(dose = "Segunda", setNames(select(dat_vax, contains("_2")), the_colnames)),
-  mutate(dose = "Booster", setNames(select(dat_vax, contains("booster")), the_colnames))) %>%
+  mutate(dose = "Booster", setNames(select(dat_vax, contains("_3")), the_colnames))) %>%
   mutate(diff = as.numeric(insert_date) - as.numeric(date)) %>%
   filter(!is.na(proveedor) & !(dose=="Segunada" & manu == "JSN")) %>%
   group_by(proveedor, dose, manu, ageRange) %>%
@@ -487,7 +547,7 @@ proveedores <- bind_rows(
             rezago = mean(diff),
             entradas_esta_semana = sum(insert_date >= today() - weeks(1)),
             rezago_esta_semana = mean(diff[insert_date >= today() - weeks(1)]),
-            .groups = "drop")
+            .groups = "drop") 
 
 ## Seguimiento
 
