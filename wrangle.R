@@ -723,6 +723,13 @@ dat_seguimiento_bydate %>%
   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) +
   geom_bar(aes(y = cases_ma7), colour=alpha("black", 1), stat="identity") +
   geom_bar(aes(y = administradas_ma7 / vacunas_rescale), colour=alpha("blue", 0.2), stat="identity") +
+  geom_line(aes(y = 1500*(ontime_cumu_ma7 + booster_deficit_cumu_ma7 +complete_deficit_cumu_ma7),
+                ),
+            linetype="dashed",
+            size=1.0, colour="darkblue", alpha=0.4) +
+  geom_line(aes(y = 1500*ontime_cumu_ma7),
+                linetype="solid",
+            size=1.5, colour="darkblue") +
   
   
   scale_y_continuous(
