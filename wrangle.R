@@ -807,8 +807,27 @@ dat_seguimiento_bydate %>%
   ylab("Casos") +
   ggtitle("Casos y vacunas")
 
+# Analisis proveedores
+dat_seguimiento[!is.na(proveedor_1) & !is.na(proveedor_2),
+                .N,.(proveedor_1 == proveedor_2, manu_1)][order(-N)]
+dat_seguimiento[!is.na(proveedor_1) & !is.na(booster_proveedor),
+                .N,.(proveedor_1 , booster_proveedor)][order(-N)]
+dat_seguimiento[manu_1 %in% c("PFR", "MOD")][vax_date_sched < last_day] %>%
+  .[,.N,.(proveedor_1, vaxed=!is.na(vax_date))] %>% 
+  .[,.(vaxed, N, Nperc = N/sum(N)),.(proveedor_1)] %>%
+  .[order(-Nperc)] %>% #%>% .[, .(N=sum(N)), vaxed] %>% .[, .(vaxed,N,Nperc=N/sum(N))]
+  .[vaxed==T,] %>%
+  ggplot(aes(x=N, y=Nperc, label=proveedor_1)) +
+  geom_point() + geom_text()
 
+dat_seguimiento[manu_1 %in% c("PFR", "MOD")][booster_date_sched < last_day] %>%
+  .[,.N,.(proveedor_2, vaxed=!is.na(booster_date))] %>% 
+  .[,.(vaxed, N, Nperc = N/sum(N)),.(proveedor_2)] %>%
+  .[order(-Nperc)] %>% .[vaxed==T,] %>%
+  ggplot(aes(x=N, y=Nperc, label=proveedor_2)) +
+  geom_point() + geom_text()
 
+# Save the rda's
 save(proveedores, file=file.path(rda_path ,"proveedores.rda"))
 save(counts, file=file.path(rda_path ,"counts.rda"))
 save(summary_tab, outcome_tab, outcome_tab_details, file=file.path(rda_path ,"tabs.rda"))
