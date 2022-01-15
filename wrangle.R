@@ -535,12 +535,13 @@ outcome_tab <- left_join(outcome_tab_totals, outcome_tab_rates,
 ## Proveedores
 
 the_colnames <- c("date", "manu", "insert_date", "proveedor", "ageRange")
-proveedores <- bind_rows(
+proveedores_bydate <- bind_rows(
   mutate(dose = "Primera", setNames(select(dat_vax, contains("_1")), the_colnames)),
   mutate(dose = "Segunda", setNames(select(dat_vax, contains("_2")), the_colnames)),
   mutate(dose = "Booster", setNames(select(dat_vax, contains("_3")), the_colnames))) %>%
   mutate(diff = as.numeric(insert_date) - as.numeric(date)) %>%
-  filter(!is.na(proveedor) & !(dose=="Segunada" & manu == "JSN")) %>%
+  filter(!is.na(proveedor) & !(dose=="Segunda" & manu == "JSN"))
+proveedores <- proveedores_bydate %>%
   group_by(proveedor, dose, manu, ageRange) %>%
   summarize(total = n(), 
             rezago = mean(diff),
@@ -550,7 +551,7 @@ proveedores <- bind_rows(
 
 
 
-save(proveedores, file=file.path(rda_path ,"proveedores.rda"))
+save(proveedores, proveedores_bydate, file=file.path(rda_path ,"proveedores.rda"))
 save(counts, file=file.path(rda_path ,"counts.rda"))
 save(summary_tab, outcome_tab, outcome_tab_details, file=file.path(rda_path ,"tabs.rda"))
 save(poblacion, poblacion_muni, file = file.path(rda_path ,"poblacion.rda"))

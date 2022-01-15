@@ -173,7 +173,8 @@ ui <- fluidPage(
                                        selected = "all"),
                            width = 3),
                          mainPanel(
-                           htmlOutput("proveedores")
+                           plotOutput("proveedores_grafica"),
+                           htmlOutput("proveedores_tabla")
                          )
                        )),
               tabPanel("Datos Diarios", 
@@ -488,7 +489,28 @@ server <- function(input, output, session) {
   }, 
   server = FALSE)
   
-  output$proveedores <- renderText({
+  output$proveedores_grafica <- renderPlot({
+    load(file.path(rda_path,"proveedores.rda"))
+    
+    top_provs <- proveedores_bydate[,.(prov_total=.N),by=proveedor][order(-prov_total)][1:6, proveedor]
+    proveedores_summary <- proveedores_bydate %>%
+      .[, .(total=.N), .(date,proveedor)] %>%
+      .[proveedor %in% top_provs] %>%
+      dcast(date ~ proveedor, value.var = 'total') %>%
+      melt( id.vars = c('date'), variable.name = "proveedor", value.name = "total") %>%
+      .[order(match(proveedor, top_provs), date)]
+    proveedores_summary[is.na(total), total := 0]
+    proveedores_summary[,total_ma7 := ma7(date, total)$moving_avg,by=proveedor]
+    proveedores_summary[, proveedor := factor(proveedor, levels=top_provs)]
+    
+    p <- proveedores_summary %>%
+      ggplot(aes(x=date, y=total_ma7)) +
+      geom_line(aes(color=proveedor), size=1) +
+      scale_color_brewer(palette="Paired") +
+      theme_bw()
+    p
+  })
+  output$proveedores_tabla <- renderText({
     load(file.path(rda_path,"proveedores.rda"))
 
     if(input$proveedor_agerange != "all") proveedores <- filter(proveedores, ageRange == input$proveedor_agerange)
