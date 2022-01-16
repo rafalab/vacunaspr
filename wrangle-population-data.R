@@ -76,11 +76,12 @@ correction <- pop_by_age_gender_municipio %>% group_by(ageRange, gender) %>%
   select(-contains("poblacion"))
 
 pop_by_age_gender_municipio <-pop_by_age_gender_municipio  %>%
-  left_join(correction, by = c("ageRange", "gender")) %>%
+  right_join(correction, by = c("ageRange", "gender")) %>%
   mutate(poblacion = poblacion*correction) %>%
   select(-correction) 
 
 pop_by_age_gender_municipio[,municipio := reorder(municipio, -poblacion, sum)]
+setcolorder(pop_by_age_gender_municipio, c("municipio", "ageRange", "gender", "poblacion"))
 
 muni_order <- pop_by_age_gender_municipio %>%
   group_by(municipio) %>% summarize(n=sum(poblacion), .groups="drop") 

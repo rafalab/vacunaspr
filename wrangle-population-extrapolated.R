@@ -38,7 +38,8 @@ pop  <- readxl::read_xlsx("data/prc-est2019-syasex.xlsx",
   group_by(ageRange, gender, date) %>%
   summarize(poblacion = sum(poblacion), .groups = "drop")
 
-dates <- seq(make_date(2008, 12, 15), last_day, by= "day")
+## estimate population for the middle of 2021
+dates <- make_date(2021, 7, 1) #seq(make_date(2008, 12, 15), last_day, by= "day")
 extrapolate <- function(tab){
   fit <- lm(poblacion ~ ns(x,3), data = tab)
   data.frame(date = dates, 
@@ -124,6 +125,9 @@ pop_by_age_gender_municipio <-pop_by_age_gender_municipio  %>%
   select(-correction) 
 
 pop_by_age_gender_municipio[,municipio := reorder(municipio, -poblacion, sum)]
+
+pop_by_age_gender[, date:=NULL]
+pop_by_age_gender_municipio[,date:=NULL]
 
 muni_order <- pop_by_age_gender_municipio %>%
   group_by(municipio) %>% summarize(n=sum(poblacion), .groups="drop") 

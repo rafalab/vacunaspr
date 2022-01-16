@@ -3,6 +3,8 @@ library(tidyverse)
 library(lubridate)
 library(scales)
 
+source("wrangle-population-extrapolated.R")
+
 ## if on the server get the latest data
 if(Sys.info()["nodename"] == "fermat.dfci.harvard.edu"){
   rda_path <- "/homes10/rafa/dashboard/vacunaspr/rdas"
@@ -20,7 +22,7 @@ load(file.path(rda_path, "population-tabs.rda"))
 
 muni_levels <- c(levels(pop_by_age_gender_municipio$municipio), "No reportado")
 
-load(file.path(rda_path, "dates.rda"))
+dates_rda_variables <- load(file.path(rda_path, "dates.rda"))
 
 administradas <- sum(!is.na(dat_vax$date_1)) +
   sum(!is.na(dat_vax$date_2)) +
@@ -309,7 +311,7 @@ piramide_tab_muni <- daily_vax_counts_by_municipio %>%
   summarize(onedose = sum(onedose), full = sum(full),
             booster=sum(booster), lost = sum(lost), .groups = "drop") %>%
   mutate(immune = full - lost) %>%
-  left_join(pop_by_age_gender_municipio, by = c("municipio","ageRange", "gender"))
+  left_join(pop_by_age_gender_municipio, by = c("municipio", "ageRange", "gender"))
 
 piramide_tab <- bind_rows(piramide_tab, piramide_tab_muni)
   
@@ -393,11 +395,11 @@ counts$status <- factor(counts$status,  levels = c("UNV", "PAR", "VAX", "BST"))
 counts$ageRange <- factor(counts$ageRange, levels = age_levels)
 counts <- counts[order(date), ]
 
-## 90 day total
-sum90 <- function(y, k = 90) as.numeric(stats::filter(y, c(0, rep(1, k)), side = 1))
+## recently infected
+moving_sum <- function(y, k = 90) as.numeric(stats::filter(y, c(0, rep(1, k)), side = 1))
 recently_infected <- copy(counts)
 recently_infected <- recently_infected[,c("date", "ageRange", "gender", "status", "manu", "cases")]
-recently_infected[, cases := sum90(cases), keyby = .(ageRange, gender, manu, status)]
+recently_infected[, cases := moving_sum(cases), keyby = .(ageRange, gender, manu, status)]
 setnames(recently_infected, "cases", "infected")
 #check:
 #recently_infected %>% ggplot(aes(date, infected, color = paste(status,manu,sep=":"))) + geom_line() + facet_grid(gender~ageRange)
@@ -422,7 +424,11 @@ booster_prop <- booster/pr_pop
 pediatric_primera <- daily_vax_counts %>% filter(ageRange=="5-11" & date >= first_ped_day) %>%
   pull(onedose) %>% sum(na.rm=TRUE)
                                                    
-ped_pop <- pop_by_age_gender %>% filter(ageRange=="5-11") %>% pull(poblacion) %>% sum()
+ped_pop <- pop_by_age_gender %>% 
+  filter(ageRange=="5-11") %>% 
+  pull(poblacion) %>% 
+  sum()
+
 pediatric_primera_prop <- pediatric_primera / ped_pop
 
 pediatric_completa <- daily_vax_counts %>% filter(ageRange=="5-11" & date >= first_ped_day) %>%
@@ -458,16 +464,29 @@ summary_tab <- data.frame(names = c("Vacunas administradas",
                   porciento = c(NA, primera_prop, completa_prop,  the_immune_prop, booster_prop, lost_prop,  pediatric_primera_prop, pediatric_completa_prop),
                   tasas = c(administradas_tasa, tasas$onedose, tasas$full, tasas$immune, tasas$booster, tasas$lost, tasas_ped$onedose, tasas_ped$full))
 
+
+# collapse age groups to minimize denominator variance --------------------
+
+collapsed_age_levels <- c("0-4", "5-11", "12-17", "18-39", "40-59", "60+")
+collapse_by_age <- function(x) fct_collapse(x, "18-39" = c("18-29", "30-39"),
+                                               "40-59" = c("40-49", "50-59"),
+                                               "60+" = c("60-69", "70-79", "80+"))
+counts$ageRange <- collapse_by_age(counts$ageRange)
+                                
+counts <- counts[, keyby = .(date, ageRange, gender, status, manu), 
+            lapply(.SD, sum), 
+            .SDcols = c("cases", "hosp", "death", "n")]
+
 ## Compute cases, hosp and death rates
 ## Include other genders in totals
 tmp <- counts %>% 
   filter(!ageRange %in% c("0-4", "5-11", "12-17") &
-           date > last_day - weeks(3) & date<=last_day - weeks(1)) %>%
-  mutate(ageRange = droplevels(ageRange)) %>%
-  mutate(ageRange = fct_collapse(ageRange, 
-                                 "18-39" = c("18-29", "30-39"),
-                                 "40-59" = c("40-49", "50-59"),
-                                 "60+" = c("60-69", "70-79", "80+"))) 
+           date > last_day - weeks(3) & date<=last_day - weeks(1)) #%>%
+  # mutate(ageRange = droplevels(ageRange)) %>%
+  # mutate(ageRange = fct_collapse(ageRange, 
+  #                                "18-39" = c("18-29", "30-39"),
+  #                                "40-59" = c("40-49", "50-59"),
+  #                                "60+" = c("60-69", "70-79", "80+"))) 
 
 outcome_tab_totals <- tmp %>%
   mutate(complete_week = date <= last_day - weeks(2))%>%
@@ -559,4 +578,4 @@ save(daily_vax_counts_by_municipio, file = file.path(rda_path, "daily_vax_counts
 save(dat_cases, file =  file.path(rda_path ,"dat_cases.rda"))
 save(immune, file = file.path(rda_path ,"immune.rda"))
 save(piramide, piramide_tab, file = file.path(rda_path, "piramide.rda"))
-
+save(list = c(dates_rda_variables, "collapsed_age_levels"), file = file.path(rda_path, "dates.rda"))

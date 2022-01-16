@@ -22,22 +22,22 @@ ui <- fluidPage(
   # Application title
   titlePanel("Informe de vacunas COVID-19 en Puerto Rico"),
   
-  tabsetPanel(id = "tabs", 
+  tabsetPanel(id = "tabs",
               tabPanel("Resumen",
                        htmlOutput("fecha"),
                        htmlOutput("summary_1"),
                        h4("Resumen de casos, hospitalizaciones y muertes"),
-                       p("Los tamaños de los groups son diferentes por lo cual no es informativo comparar totales sino las tasas (por 100K por día). Los totales no incluyen personas que han dado positivo a una prueba diagnóstica en los últimos 90 días. También tomen en cuenta que los datos de vacunas tienen mayor rezago que los de la pruebas."),
-                       radioButtons("summary_type", 
+                       p("Los tamaños de los groups son diferentes por lo cual no es informativo comparar totales sino las tasas (por 100K por día). Los totales no incluyen personas que han dado positivo a una prueba diagnóstica en los últimos 180 días. También tomen en cuenta que los datos de vacunas tienen mayor rezago que los de la pruebas."),
+                       radioButtons("summary_type",
                                     label = "",
                                     choices = list("Sencillo" = "simple",
                                                    "Detallado" = "detail"),
                                     selected = "simple",
                                     inline = TRUE),
-                       htmlOutput("titulo_2"),
-                       htmlOutput("summary_2"),
                        htmlOutput("titulo_3"),
-                       htmlOutput("summary_3")
+                       htmlOutput("summary_3"),
+                       htmlOutput("titulo_2"),
+                       htmlOutput("summary_2")
               ),
               tabPanel("Eventos",
                        sidebarLayout(
@@ -48,7 +48,7 @@ ui <- fluidPage(
                                                   Hospitalizaciones = "hosp",
                                                   Casos = "cases"),
                                        selected = "death"),
-                           dateRangeInput("event_range", "Periodo", 
+                           dateRangeInput("event_range", "Periodo",
                                           start = last_day - days(240),
                                           end = last_day_counts,
                                           format = "M-dd-yyyy",
@@ -60,7 +60,7 @@ ui <- fluidPage(
                                        "Grupo de Edad",
                                        choice = c("Agregados" = "all",
                                                   "Todos" = "facet",
-                                                  rev(age_levels[-1])),
+                                                  rev(collapsed_age_levels[-1])),
                                        selected = "all"),
                            selectInput("event_scale",
                                        "Escala",choice = c("Lineal" = "linear",
@@ -71,7 +71,7 @@ ui <- fluidPage(
                             plotOutput("muertes_plot"),
                             DT::dataTableOutput("muertes_tabla"))
                          )),
-              
+
               tabPanel("Gráficas",
                        sidebarLayout(
                          sidebarPanel(
@@ -84,25 +84,25 @@ ui <- fluidPage(
                                        "Estado de vacunación",
                                        choice = c(`Una dosis` = "onedose",
                                                   `Completa` = "full",
-                                                  `Booster` = "booster", 
+                                                  `Booster` = "booster",
                                                   `Sin necesidad de booster` = "immune"),
                                        selected = "full"),
                            selectInput("graficas_manu",
                                        "Tipo de vacuna",
                                        choice = c(`Agregadas` = "all",
-                                                  `Todas` = "facet", 
+                                                  `Todas` = "facet",
                                                   `Pfizer` = "PFR",
-                                                  `Moderna` = "MOD", 
+                                                  `Moderna` = "MOD",
                                                   `J&J` = "JSN"),
-                                       selected = "all"), 
+                                       selected = "all"),
                            selectInput("graficas_agerange",
                                        "Grupo de Edad",
                                        choice = c("Agregados" = "all",
                                                   "Todos" = "facet",
                                                   rev(age_levels[-1])),
                                        selected = "all"),
-                           dateRangeInput("graficas_range", 
-                                          "Periodo", 
+                           dateRangeInput("graficas_range",
+                                          "Periodo",
                                           start = last_day - days(240),
                                           end = last_day,
                                           format = "M-dd-yyyy",
@@ -133,8 +133,8 @@ ui <- fluidPage(
                            DT::dataTableOutput("municipio_tabla")
                          )
                        )),
-             
-             
+
+
               tabPanel("Pirámide",
                        sidebarLayout(
                          sidebarPanel(
@@ -176,10 +176,10 @@ ui <- fluidPage(
                            htmlOutput("proveedores")
                          )
                        )),
-              tabPanel("Datos Diarios", 
+              tabPanel("Datos Diarios",
                        sidebarLayout(
                          sidebarPanel(
-                           dateRangeInput("tabla_range", "Periodo", 
+                           dateRangeInput("tabla_range", "Periodo",
                                           start = last_day - days(60),
                                           end = last_day,
                                           format = "M-dd-yyyy",
@@ -668,7 +668,7 @@ server <- function(input, output, session) {
     " <h3> Información importante sobre el manejo de datos en este dashboard </h3>
   <br/> 
 
-<b> Nota: </b> Los datos presentados en este dashboard pueden cambiar según pasa el tiempo pues provienen de una base de datos viva sujeta a ediciones según nueva información se hace disponible. Además, como parte del proceso de organización y limpieza de datos, los analistas encargados de este dashboard pueden hacer modificaciones que entiendan pertinentes para mejorar la calidad de la información que aquí se presenta. 
+Los datos presentados en este dashboard pueden cambiar según pasa el tiempo pues provienen de una base de datos viva sujeta a ediciones según nueva información se hace disponible. Además, como parte del proceso de organización y limpieza de datos, los analistas encargados de este dashboard pueden hacer modificaciones que entiendan pertinentes para mejorar la calidad de la información que aquí se presenta. 
 
 <br/> <br/>
   
@@ -702,7 +702,7 @@ Para calcular las tasas de cada evento por estado de vacunación y grupo de edad
   
 <h4> Estimados poblacionales </h4>
 
-Los estimados poblacionales que se usan en este dashboard provienen de un ajuste que se realiza utilizando el estimado poblacional del CENSO Decenal 2020 y los estimados poblacionales (por grupo edad, municipio y sexo) de ACS 2019. La razón para realizar el ajuste es porque se entiende que los estimados del ACS 2019 no capturan la realidad de la población puertorriqueña del 2020-2021 y se ha anunciado que el <i> U.S. Census Bureau </i> no estará publicando los estimados del ACS 2020 para Puerto Rico. Para estudiar el código de este proceso puede accesar: <a> https://github.com/rafalab/vacunaspr/blob/main/wrangle-population-data.R </a>. 
+Los estimados poblacionales que se usan en este dashboard provienen de un ajuste que se realiza utilizando el estimado poblacional del CENSO Decenal 2020 y los estimados poblacionales (por grupo edad, municipio y sexo) de ACS 2019. La razón para realizar el ajuste es porque se entiende que los estimados del ACS 2019 no capturan la realidad de la población puertorriqueña del 2020-2021 y se ha anunciado que el <i> U.S. Census Bureau </i> aun no estará publicando los estimados del ACS 2020 para Puerto Rico. Una vez el <i> U.S. Census Bureau </i> publique los estimados más recientes, los incorporaremos al nuestro análisis. Noten que este cambiará las tasas reportadas pues afecta los denominadores. Para estudiar el código de este proceso puede accesar: <a> https://github.com/rafalab/vacunaspr/blob/main/wrangle-population-data.R </a>. 
     
     
     "})
