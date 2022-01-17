@@ -319,7 +319,7 @@ make_outcome_tab <- function(tab, complete = TRUE, details = FALSE){
       select(ageRange, status, manu, n, death, death_rate,  hosp, hosp_rate, cases, cases_rate)
     
       kableExtra::kbl(tab, col.names = c("Grupo de edada", "Vacunación", "Tipo de vacuna", "Número de personas", "Muertes", "Muertes por 100K por día",  "Hosp", "Hosp por 100K por día", "Casos", "Casos por 100K por día"),
-                      align = c("c","c", rep("r", 8)))  %>%
+                      align = c("c", "c", "c", "c", rep(c("c","l"), 3)))  %>%
       kableExtra::kable_styling() %>%
       kableExtra::column_spec(1, width = "12em") %>%
       kableExtra::row_spec(which(tab$status=="No vacunados"), bold = FALSE, color = "black", background = status_colors[["UNV"]]) %>%
@@ -345,7 +345,7 @@ make_outcome_tab <- function(tab, complete = TRUE, details = FALSE){
       select(ageRange, status, n,  death, death_rate, hosp, hosp_rate, cases, cases_rate)
     
     kableExtra::kbl(tab,col.names = c("Group de Edad", "Vacunación", "Número de personas",  "Muertes","Muertes por 100K por día",  "Hosp", "Hosp por 100K por día", "Casos", "Casos por 100K por día"),
-                    align = c("c","c", rep("r", 7)))  %>%
+                    align = c("c", "c", "c", rep(c("c","l"), 3)))  %>%
       kableExtra::kable_styling() %>%
       kableExtra::column_spec(1, width = "12em") %>%
       kableExtra::row_spec(which(tab$status=="No vacunados"), bold = FALSE, color = "black", background = status_colors[["UNV"]]) %>%
