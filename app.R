@@ -27,7 +27,7 @@ ui <- fluidPage(
                        htmlOutput("fecha"),
                        htmlOutput("summary_1"),
                        h4("Resumen de casos, hospitalizaciones y muertes"),
-                       p("Los tamaños de los groups son diferentes por lo cual no es informativo comparar totales sino las tasas (por 100K por día). Los totales no incluyen personas que han dado positivo a una prueba diagnóstica en los últimos 90 días. También tomen en cuenta que los datos de vacunas tienen mayor rezago que los de la pruebas y que, debido a que el US Census Bureau  no ha provisto tamaños poblaciones del 2020 y 2021 por edad para Puerto Rico, el número de personas es aproximando (ver FAQ)."),
+                       p("Los tamaños de los grupos son diferentes por lo cual no es informativo comparar totales sino las tasas (por 100K por día). Los totales no incluyen personas que han dado positivo a una prueba diagnóstica en los últimos 90 días. También tome en cuenta que los datos de vacunas tienen mayor rezago que los de la pruebas y que, debido a que el US Census Bureau no ha provisto tamaños poblacionales del 2020 y 2021 por edad para Puerto Rico, el número de personas en cada grupo es aproximando (ver FAQ)."),
                        radioButtons("summary_type",
                                     label = "",
                                     choices = list("Sencillo" = "simple",
