@@ -320,6 +320,12 @@ server <- function(input, output, session) {
   output$muertes_tabla <- DT::renderDataTable({
     load(file.path(rda_path, "dat_cases.rda"))
     
+    collapse_by_age <- function(x) fct_collapse(x, "18-39" = c("18-29", "30-39"),
+                                                "40-59" = c("40-49", "50-59"),
+                                                "60+" = c("60-69", "70-79", "80+"))
+    dat_cases$ageRange <- collapse_by_age(dat_cases$ageRange)
+    
+    
     date_name <-  paste0("date_", input$event_type)
     
     if(!input$event_agerange %in% c("all", "facet")){
@@ -344,8 +350,6 @@ server <- function(input, output, session) {
       mutate(status = ifelse(gender == "F" & status == "No vacunado", "No vacunada", status)) %>%
       mutate(manu = recode(as.character(manu), UNV = "", MOD = "Moderna", PFR = "Pfizer", JSN = "J & J"))
      
-
-
     make_datatable(ret, 
                    col.names = c("Fecha", "Grupo de edad", "Sexo", "Vacunación", 
                                  "Tipo de vacuna", "Días desde completar dosis", 
