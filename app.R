@@ -209,13 +209,13 @@ server <- function(input, output, session) {
   output$titulo_2 <- renderText({
     load(file.path(rda_path, "dates.rda"))
     paste("<p>Semana acabando", 
-          format(last_day-weeks(2), "%B %d, %Y:"), "</p>")
+          format(last_day_counts-weeks(2), "%B %d, %Y:"), "</p>")
     })
 
   output$titulo_3 <- renderText({
     load(file.path(rda_path, "dates.rda"))
     paste("<p>Semana acabando", 
-          format(last_day-weeks(1), "%B %d, %Y"), " (datos parciales):</p>")})
+          format(last_day_counts-weeks(1), "%B %d, %Y"), " (datos parciales):</p>")})
   
   output$update <- renderText({
     paste0("<h4>Última actualización: ", format(the_stamp, "%B %d, %Y"), "</h4>")
