@@ -3,7 +3,7 @@ library(tidyverse)
 library(lubridate)
 library(scales)
 
-source("wrangle-population-extrapolated.R")
+#source("wrangle-population-extrapolated.R")
 
 ## if on the server get the latest data
 if(Sys.info()["nodename"] == "fermat.dfci.harvard.edu"){
