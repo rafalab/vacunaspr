@@ -26,22 +26,28 @@ dates_rda_variables <- load(file.path(rda_path, "dates.rda"))
 
 administradas <- sum(!is.na(dat_vax$date_1)) +
   sum(!is.na(dat_vax$date_2)) +
-  sum(!is.na(dat_vax$date_3))
+  sum(!is.na(dat_vax$date_3)) + 
+  sum(!is.na(dat_vax$date_4))
 
 administradas_tasa <- 
   (filter(dat_vax, date_1 %in% span_range) %>% nrow +
   filter(dat_vax, date_2 %in% span_range) %>% nrow +
-  filter(dat_vax, date_3 %in% span_range) %>% nrow )/length(span_range) * 7
+  filter(dat_vax, date_3 %in% span_range) %>% nrow  + 
+  filter(dat_vax, date_4 %in% span_range) %>% nrow )/length(span_range) * 7
 
 dat_vax <- dat_vax[!manu_1 %in% c("ATZ","OTR") & 
                      !manu_2 %in% c("ATZ","OTR") &
-                     !manu_3 %in% c("ATZ","OTR"), ] 
+                     !manu_3 %in% c("ATZ","OTR") &
+                     !manu_4 %in% c("ATZ","OTR"), ] 
 dat_vax$manu_1 <- droplevels(dat_vax$manu_1)
 dat_vax$manu_2 <- droplevels(dat_vax$manu_2)
 dat_vax$manu_3 <- droplevels(dat_vax$manu_3)
+dat_vax$manu_4 <- droplevels(dat_vax$manu_4)
 
+dat_vax[estado %in% c("PR", "No reportado") & !is.na(date_4), c("vax_date", "extra_dose", "booster_date", "booster_manu", "booster_insert_date", "booster_proveedor", "booster_ageRange") := 
+          .(date_2, date_3, date_4, manu_4, insert_date_4, proveedor_4, ageRange_4)]
 
-dat_vax[estado %in% c("PR", "No reportado") , 
+dat_vax[estado %in% c("PR", "No reportado") & is.na(date_4) , 
         c("vax_date", "booster_date", "booster_manu", "booster_insert_date", "booster_proveedor", "booster_ageRange") := 
           .(date_2, date_3, manu_3, insert_date_3, proveedor_3, ageRange_3)]
 dat_vax[manu_1 == "JSN", 
@@ -429,6 +435,11 @@ ped_pop <- pop_by_age_gender %>%
   pull(poblacion) %>% 
   sum()
 
+ped2_pop <- pop_by_age_gender %>% 
+  filter(ageRange=="12-17") %>% 
+  pull(poblacion) %>% 
+  sum()
+
 pediatric_primera_prop <- pediatric_primera / ped_pop
 
 pediatric_completa <- daily_vax_counts %>% filter(ageRange=="5-11" & date >= first_ped_day) %>%
@@ -439,6 +450,18 @@ pediatric_completa_prop <- pediatric_completa/ ped_pop
 lost <-  sum(daily_vax_counts$lost)
 lost_prop <-lost/pr_pop
 
+four_dose <- sum(!is.na(dat_vax$extra_dose))
+
+booster_ped <- daily_vax_counts %>% filter(ageRange=="12-17" & date >= make_date(2022,01,06)) %>%
+  pull(booster) %>% sum(na.rm=TRUE)
+
+booster_ped_prop <- booster_ped/ ped2_pop
+
+lost_ped <- daily_vax_counts %>% filter(ageRange=="12-17" & date >= make_date(2022,01,06)) %>%
+  pull(lost) %>% sum(na.rm=TRUE)
+
+lost_ped_prop <- lost_ped/ ped2_pop
+
 tasas <- daily_vax_counts %>% 
   filter(date %in% span_range) %>%
   summarize(onedose = sum(onedose)/length(span_range) * 7, 
@@ -447,22 +470,36 @@ tasas <- daily_vax_counts %>%
             booster = sum(booster)/length(span_range)  * 7, 
             lost = sum(lost)/length(span_range)*7)
 
+
 tasas_ped <- daily_vax_counts %>% 
   filter(date %in% span_range & ageRange=="5-11") %>%
   summarize(onedose = sum(onedose)/length(span_range) * 7, 
             full= sum(full)/length(span_range) * 7)
+
+
+tasas_ped_2 <- daily_vax_counts %>% 
+  filter(date %in% span_range & ageRange=="12-17") %>%
+  summarize(onedose = sum(onedose)/length(span_range) * 7, 
+            full= sum(full)/length(span_range) * 7, 
+            immune = (sum(full) - sum(lost))/length(span_range)*7,
+            booster = sum(booster)/length(span_range)  * 7, 
+            lost = sum(lost)/length(span_range)*7)
+            
 
 summary_tab <- data.frame(names = c("Vacunas administradas",
                             "Personas con por lo menos 1 dosis",
                             "Personas con dosis completa",
                             "Personas con dosis completa sin necesidad de booster",
                             "Personas con boosters",
+                            "Personas inmunocomprometidas con dosis adicional y booster",
                             "Personas con dosis completa con necesidad de booster",
+                            "Menores (12-17 años) con booster",
+                            "Menores (12-17 años) con necesidad de booster",
                             "Menores (5-11 años) con por lo menos 1 dosis",
                             "Menores (5-11 años) con dosis completa"),
-                  total = c(administradas, primera, completa,  the_immune, booster, lost,  pediatric_primera, pediatric_completa),
-                  porciento = c(NA, primera_prop, completa_prop,  the_immune_prop, booster_prop, lost_prop,  pediatric_primera_prop, pediatric_completa_prop),
-                  tasas = c(administradas_tasa, tasas$onedose, tasas$full, tasas$immune, tasas$booster, tasas$lost, tasas_ped$onedose, tasas_ped$full))
+                  total = c(administradas, primera, completa,  the_immune, booster, four_dose,lost, booster_ped, lost_ped, pediatric_primera, pediatric_completa),
+                  porciento = c(NA, primera_prop, completa_prop,  the_immune_prop, booster_prop, NA, lost_prop, booster_ped_prop, lost_ped_prop,  pediatric_primera_prop, pediatric_completa_prop),
+                  tasas = c(administradas_tasa, tasas$onedose, tasas$full, tasas$immune, tasas$booster, NA, tasas$lost, tasas_ped_2$booster, tasas_ped_2$lost, tasas_ped$onedose, tasas_ped$full))
 
 
 # collapse age groups to minimize denominator variance --------------------
@@ -481,7 +518,7 @@ counts <- counts[, keyby = .(date, ageRange, gender, status, manu),
 ## Include other genders in totals
 tmp <- counts %>% 
   filter(!ageRange %in% c("0-4", "5-11", "12-17") &
-           date > last_day - weeks(3) & date<=last_day - weeks(1)) #%>%
+           date > last_day_counts - weeks(3) & date<=last_day_counts - weeks(1)) #%>%
   # mutate(ageRange = droplevels(ageRange)) %>%
   # mutate(ageRange = fct_collapse(ageRange, 
   #                                "18-39" = c("18-29", "30-39"),
@@ -489,7 +526,7 @@ tmp <- counts %>%
   #                                "60+" = c("60-69", "70-79", "80+"))) 
 
 outcome_tab_totals <- tmp %>%
-  mutate(complete_week = date <= last_day - weeks(2))%>%
+  mutate(complete_week = date <= last_day_counts - weeks(2))%>%
   group_by(complete_week, ageRange, status, manu) %>%
   summarize(cases = sum(cases), hosp=sum(hosp), 
             death = sum(death),
@@ -501,7 +538,7 @@ outcome_tab_rates <- tmp %>%
   group_by(date, ageRange, status, manu) %>%
   summarize(n = sum(n), cases = sum(cases), hosp=sum(hosp), death = sum(death),
             .groups = "drop")  %>%
-  mutate(complete_week = date <= last_day - weeks(2))%>%
+  mutate(complete_week = date <= last_day_counts - weeks(2))%>%
   group_by(complete_week, ageRange, status, manu) %>%
   summarize(n = mean(n), 
             cases = sum(cases), hosp=sum(hosp), 
@@ -519,7 +556,7 @@ outcome_tab_details <- left_join(outcome_tab_totals, outcome_tab_rates,
 tmp <- filter(tmp, status != "PAR") 
 
 outcome_tab_totals <- tmp %>%
-  mutate(complete_week = date <= last_day - weeks(2))%>%
+  mutate(complete_week = date <= last_day_counts - weeks(2))%>%
   group_by(complete_week, ageRange, status) %>%
   summarize(cases = sum(cases), hosp=sum(hosp), 
             death = sum(death),
@@ -531,7 +568,7 @@ outcome_tab_rates <- tmp %>%
   group_by(date, ageRange, status) %>%
   summarize(n = sum(n), cases = sum(cases), hosp=sum(hosp), death = sum(death),
             .groups = "drop")  %>%
-  mutate(complete_week = date <= last_day - weeks(2))%>%
+  mutate(complete_week = date <= last_day_counts - weeks(2))%>%
   group_by(complete_week, ageRange, status) %>%
   summarize(n = mean(n), 
             cases = sum(cases), hosp=sum(hosp), 
@@ -559,8 +596,8 @@ proveedores <- bind_rows(
   mutate(dose = "Segunda", setNames(select(dat_vax, contains("_2")), the_colnames)),
   mutate(dose = "Booster", setNames(select(dat_vax, contains("_3")), the_colnames))) %>%
   mutate(diff = as.numeric(insert_date) - as.numeric(date)) %>%
-  filter(!is.na(proveedor) & !(dose=="Segunada" & manu == "JSN")) %>%
-  group_by(proveedor, dose, manu, ageRange) %>%
+  filter(!is.na(proveedor) & !(dose=="Segunda" & manu == "JSN")) %>%
+  group_by(proveedor, date, dose, manu, ageRange) %>%
   summarize(total = n(), 
             rezago = mean(diff),
             entradas_esta_semana = sum(insert_date >= today() - weeks(1)),
