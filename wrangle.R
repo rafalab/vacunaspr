@@ -591,19 +591,27 @@ outcome_tab <- left_join(outcome_tab_totals, outcome_tab_rates,
 ## Proveedores
 
 the_colnames <- c("date", "manu", "insert_date", "proveedor", "ageRange")
-proveedores <- bind_rows(
-  mutate(dose = "Primera", setNames(select(dat_vax, contains("_1")), the_colnames)),
-  mutate(dose = "Segunda", setNames(select(dat_vax, contains("_2")), the_colnames)),
-  mutate(dose = "Booster", setNames(select(dat_vax, contains("_3")), the_colnames))) %>%
-  mutate(diff = as.numeric(insert_date) - as.numeric(date)) %>%
-  filter(!is.na(proveedor) & !(dose=="Segunda" & manu == "JSN")) %>%
-  group_by(proveedor, date, dose, manu, ageRange) %>%
-  summarize(total = n(), 
-            rezago = mean(diff),
-            entradas_esta_semana = sum(insert_date >= today() - weeks(1)),
-            rezago_esta_semana = mean(diff[insert_date >= today() - weeks(1)]),
-            .groups = "drop") 
+cols1 <- grep("_1", names(dat_vax))
+cols2 <- grep("_2", names(dat_vax))
+cols3 <- grep("_3", names(dat_vax))
 
+proveedores <- rbindlist(list(
+  setnames(dat_vax[,..cols1], the_colnames)[,dose:="Primera"],
+  setnames(dat_vax[,..cols2], the_colnames)[,dose:="Segunda"],
+  setnames(dat_vax[,..cols3], the_colnames)[,dose:="Tercera"])
+  )
+proveedores[, index := insert_date >= today() -weeks(1)]  
+proveedores[, diff := as.numeric(insert_date) - as.numeric(date)]
+my_func <- function(tab){
+  with(tab, list(total = length(diff),
+                 rezago = mean(diff), 
+                 entradas_esta_semana = sum(index), 
+                 rezago_esta_semana = mean(diff[index])))
+}
+proveedores <- proveedores[!is.na(proveedor) & !(dose=="Segunda" & manu == "JSN"),
+          my_func(.SD), 
+           by=.(proveedor, date, dose, manu, ageRange),
+           .SDcols = c("diff", "index")]
 
 
 save(proveedores, file=file.path(rda_path ,"proveedores.rda"))
