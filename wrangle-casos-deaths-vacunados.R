@@ -2,18 +2,17 @@ source("~/R/vacunaspr/init.R")
 library(data.table)
 
 age_starts <- c(0, 5, 12, 18, seq(25, 85, 5))
-#age_starts <- c(0, 5, 12, 18, seq(30, 80, 10))
 age_ends <- c(age_starts[-1]-1, Inf)
 age_levels <- paste(age_starts, age_ends, sep = "-")
 age_levels[length(age_levels)] <- paste0(age_starts[length(age_levels)],"+")
-
 manu_levels <- c("UNV", "MOD", "PFR", "JSN")
 first_ped_day <- make_date(2021, 11, 04)
 first_booster_day <- make_date(2021, 8, 13) 
 first_jnj_booster_day <- make_date(2021, 10, 22)
 first_day_cases <- make_date(2020,09,15)
+gender_levels <- c( "F", "M", "O", "U")
 
-first_day_cases <- make_date(2020,09,15)
+# useful function
 
 convert_date <- function(d) as_date(ymd_hms(d, tz = "America/Puerto_Rico"))
 recode_manu <- function(x)  recode(x, 'Johnson & Johnson' = 'JSN', 
@@ -32,35 +31,18 @@ dat_cases <-  readRDS("~/R/vacunaspr/rdas/casos.RDS") %>%
   mutate(ageRange = cut(age, c(age_starts, Inf), labels = age_levels,  right=F )) %>% 
   mutate(ageRange = factor(ageRange, levels = age_levels)) %>%
   as_tibble() %>%
-  # unnest_wider(immunizations) %>%
-  # unnest_wider(manufacturer) %>%
-  # rename(manu_1 = "...1", 
-  #        manu_2 = "...2",
-  #        manu_3 = "...3", 
-  #        manu_4 = "...4",
-  #        manu_5 = "...5", 
-  #        manu_6 = "...6") %>%
-  # unnest_wider(administrationDate) %>%
-  rename(
-    # dose_1 = "...1", 
-    #      dose_2 = "...2",
-    #      dose_3 = "...3", 
-    #      dose_4 = "...4",
-    #      dose_5 = "...5", 
-    #      dose_6 = "...6",
-         gender = sex,
+  rename(gender = sex,
          date = earliestPositiveDiagnosticSampleCollectedDate,
          date_hosp = lastHospitalizedDate,
          date_death = deathDate) %>%
   select(-contains("Name"), -age, -birthDate) %>%
   mutate(across(contains("manu"), recode_manu)) %>% 
-  mutate(gender = case_when(
-    is.na(gender) ~ "O", 
-    gender=="Female" ~ "F", 
-    gender=="Male" ~ "M",
-    gender=="Unknown" ~ "O", 
-    gender=="Otro" ~ "O")) %>%
-  mutate(gender = factor(gender, levels = unique(gender))) 
+  mutate(gender = case_when(str_starts(gender, "F|F") ~ "F",
+                            str_starts(gender, "M|m") ~ "M", 
+                            str_starts(gender, "U|u") ~ "U",
+                            str_starts(gender, "O|o") ~ "O", 
+                            is.na(gender) ~ "O")) %>%
+  mutate(gender = factor(gender, levels = gender_levels)) 
 
 ## include death data 
 
@@ -68,7 +50,12 @@ deaths_BP <- readRDS("~/R/vacunaspr/rdas/deaths_BP.RDS") %>%
   setNames(c("patientId", "birthDate", "gender", "physicalCity", "personDiedCovid", "date_death")) %>%
   filter(!(patientId %in% dat_cases$patientId)) %>%
   mutate(across(contains("date"), convert_date)) %>%
-  mutate(gender = factor(gender, levels = unique(gender))) %>%
+  mutate(gender = case_when(str_starts(gender, "F|F") ~ "F",
+                            str_starts(gender, "M|m") ~ "M", 
+                            str_starts(gender, "U|u") ~ "U",
+                            str_starts(gender, "O|o") ~ "O", 
+                            is.na(gender) ~ "O")) %>%
+  mutate(gender = factor(gender, levels = gender_levels)) %>%
   mutate(age = floor(as.numeric(difftime(date_death, birthDate, units="days"))/365.25)) %>%
   mutate(ageRange = cut(age, c(age_starts, Inf), labels = age_levels,  right=F )) %>% 
   mutate(ageRange = factor(ageRange, levels = age_levels))  %>%
@@ -77,7 +64,6 @@ deaths_BP <- readRDS("~/R/vacunaspr/rdas/deaths_BP.RDS") %>%
 ### merge death data with case data
 
 dat_cases <- rbindlist(list(deaths_BP, dat_cases), fill=T) %>% distinct(patientId, .keep_all = T)
-
 
 ### FOR NOW USE MY OWN MATCH
 load("~/R/vacunaspr/rdas/bp_preis_maps.rda")
@@ -93,7 +79,9 @@ dat_cases <- dat_cases %>%
 dat_cases_vax <- dat_cases %>% 
   select(date, ageRange, gender.x, date_hosp, 
           date_death, municipio, estado, date_1, manu_1, proveedor_1,
-         date_2, manu_2, proveedor_2, date_3, manu_3, proveedor_3, score) %>%
+         date_2, manu_2, proveedor_2, date_3, manu_3, proveedor_3, 
+         date_4, manu_4, proveedor_4, extra_dose, vax_date, booster_date, booster_manu, 
+         booster_proveedor, last_immune_date, score) %>%
   mutate(hosp = if_else(is.na(date_hosp), FALSE, TRUE)) %>%
   mutate(death =if_else(is.na(date_death), FALSE, TRUE)) %>%
   rename(gender = "gender.x") %>%
