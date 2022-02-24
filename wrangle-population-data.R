@@ -2,9 +2,9 @@ library(tidyverse)
 library(lubridate)
 library(data.table)
 
-pr_pop <- 3285874 ## population of puerto rico
-pr_adult_pop <- 2724903
-pr_child_pop <- pr_pop - pr_adult_pop
+# pr_pop <- 3285874 ## population of puerto rico
+# pr_adult_pop <- 2724903
+# pr_child_pop <- pr_pop - pr_adult_pop
 
 
 if(Sys.info()["nodename"] == "fermat.dfci.harvard.edu"){
@@ -25,19 +25,24 @@ pop_by_age_gender  <-
   setNames(c("gender", "ageRange", "poblacion")) %>%
   filter(gender !=0 & ageRange != 999) %>%
   mutate(gender = ifelse(gender==1, "M", "F")) %>%
-  mutate(g = ifelse(ageRange>= 18, "adult", "child")) %>%
-  left_join(data.frame(g = c("adult", "child"), new = c(pr_adult_pop, pr_child_pop)), by = "g") %>%
-  group_by(g) %>%
-  mutate(poblacion = poblacion/sum(poblacion)*new) %>%
-  ungroup() %>%
+  #  mutate(g = ifelse(ageRange>= 18, "adult", "child")) %>%
+  #  left_join(data.frame(g = c("adult", "child"), new = c(pr_adult_pop, pr_child_pop)), by = "g") %>%
+  # group_by(g) %>%
+  #  mutate(poblacion = poblacion/sum(poblacion)*new) %>%
+  #  ungroup() %>%
   mutate(ageRange = factor(as.character(cut(ageRange, c(breaks, Inf), right = FALSE,
                                             labels = labels)), levels = labels)) %>%
   group_by(ageRange, gender) %>%
-  summarize(poblacion = sum(poblacion), .groups = "drop") %>%
+  summarize(poblacion = sum(poblacion), .groups = "drop")  %>%
+  mutate(gender = factor(gender)) %>%
   as.data.table() 
 
+pr_pop <- sum(pop_by_age_gender$poblacion)
+pr_adult_pop <- sum(pop_by_age_gender[!ageRange %in% c("0-4", "5-11", "12-17")]$poblacion)
+
+
 pop_by_age_gender_municipio <- 
-  read_csv("data/prm-est2019-agesex.csv",  locale = locale(encoding = "ISO-8859-1"))  %>% filter(YEAR == 12) %>%
+  read_csv("data/PRM-EST2020-AGESEX.csv",  locale = locale(encoding = "ISO-8859-1"))  %>% filter(YEAR == 13) %>%
   select(NAME, matches("AGE.+_[FEM|MALE]")) %>%
   pivot_longer(-NAME) %>%
   mutate(name = str_remove(name, "AGE")) %>%
@@ -46,12 +51,11 @@ pop_by_age_gender_municipio <-
   pivot_wider(names_from = age, values_from = value) %>% 
   mutate(`1013` = `0513`-`0509`,
          `1017` = `1013` + `1417`,
-         `1829` = `1824` + `2529`,
-         `80Inf` = `8084` + `85PLUS`) %>%
+         `85Inf` = `85PLUS`) %>%
   mutate(`0511` = 0.5* `0509` * 7/5 + 0.5 * `0513`*7/9,
          `1217` = `1017` * 6/8) %>%
-  select(NAME, gender, "0004", "0511", "1217", "1829", "3034", "3539", "4044",
-         "4549", "5054", "5559", "6064", "6569", "7074", "7579", "80Inf") %>%
+  select(NAME, gender, "0004", "0511", "1217", "1824", "2529", "3034", "3539", "4044",
+         "4549", "5054", "5559", "6064", "6569", "7074", "7579", "8084", "85Inf") %>%
   rename(municipio =  NAME) %>% 
   mutate(municipio = str_remove(municipio, " Municipio")) %>%
   mutate(gender = recode(gender, MALE = "M", FEM = "F")) %>%
@@ -71,7 +75,7 @@ correction <- pop_by_age_gender_municipio %>% group_by(ageRange, gender) %>%
   mutate(correction = poblacion.y / poblacion.x) %>% 
   select(-contains("poblacion"))
 
-pop_by_age_gender_municipio <-pop_by_age_gender_municipio  %>%
+pop_by_age_gender_municipio <- pop_by_age_gender_municipio  %>%
   right_join(correction, by = c("ageRange", "gender")) %>%
   mutate(poblacion = poblacion*correction) %>%
   select(-correction) 

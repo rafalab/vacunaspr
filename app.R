@@ -19,9 +19,10 @@ ui <- fluidPage(
   #-- Google analytics add on
   tags$head(includeHTML(("google-analytics.html"))),
   
+  #titlePanel("Informe de vacunas COVID-19 en Puerto Rico"))
   # Application title
   titlePanel("Informe de vacunas COVID-19 en Puerto Rico"),
-  
+
   tabsetPanel(id = "tabs",
               tabPanel("Resumen",
                        htmlOutput("fecha"),
@@ -285,7 +286,7 @@ server <- function(input, output, session) {
        mutate(rate = ma7(date, outcome, k = the_k)$moving_avg/denom * 10^5) %>%
        ungroup() %>%
        filter(date >= input$event_range[1] & date <= input$event_range[2]) %>%
-       filter(denom > 10000) %>%
+       filter(denom > 1000) %>%
        mutate(Booster = factor(ifelse(status != "BST",  "Sin", "Con"), levels = c("Sin", "Con"))) 
      
        p <- tmp %>% ggplot(aes(date, rate, color = manu, lty = Booster)) +
@@ -320,16 +321,14 @@ server <- function(input, output, session) {
   output$muertes_tabla <- DT::renderDataTable({
     load(file.path(rda_path, "dat_cases.rda"))
     
-    collapse_by_age <- function(x) fct_collapse(x, "18-39" = c("18-29", "30-39"),
-                                                "40-59" = c("40-49", "50-59"),
-                                                "60+" = c("60-69", "70-79", "80+"))
-    dat_cases$ageRange <- collapse_by_age(dat_cases$ageRange)
-    
-    
+    dat_cases$ageRange_2 <- fct_collapse(dat_cases$ageRange, 
+                                         "18-44" = c("18-24", "25-29", "30-34", "35-39", "40-44"),
+                                         "45-64" = c("45-49", "50-54", "55-59","60-64"),
+                                         "65+" = c("65-69", "70-74", "75-79","80-84", "85+"))
     date_name <-  paste0("date_", input$event_type)
     
     if(!input$event_agerange %in% c("all", "facet")){
-      dat_cases <- filter(dat_cases, ageRange == input$event_agerange)
+      dat_cases <- filter(dat_cases, ageRange_2 == input$event_agerange)
     } 
     
     dat_cases$cases <- TRUE

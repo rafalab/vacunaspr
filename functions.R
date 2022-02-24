@@ -356,3 +356,7 @@ make_outcome_tab <- function(tab, complete = TRUE, details = FALSE){
   }
 }
 
+
+
+
+
