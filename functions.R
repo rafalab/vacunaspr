@@ -299,10 +299,9 @@ simplify_proveedor <- function(x, col_name = "proveedor") {
                                      str_detect(proveedor, ".*CENTRO.*|.*CENTER.*|.*CNTR|CTR|PRYMED|SALUS|CERVAC|QCDC|GROUP|INST|WIC|SERV|INC|MALL|LLC|CORP|COSSMA|PROMED|FMC|FRESENIUS") ~ "Centros de Salud",
                                      TRUE ~ "Otros")) }
   
-make_outcome_tab <- function(tab, complete = TRUE, details = FALSE){
+make_outcome_tab <- function(tab,  details = FALSE){
   if(details){
     tab <- tab %>% 
-      filter(complete_week == complete) %>%
       mutate(status = recode(status, UNV = "No vacunados", 
                              PAR= "Parcial", 
                              VAX="Vacunados sin booster", 
@@ -310,12 +309,12 @@ make_outcome_tab <- function(tab, complete = TRUE, details = FALSE){
       mutate(manu = recode(as.character(manu), UNV = "", MOD = "Moderna", 
                            PFR = "Pfizer", JSN = "J & J")) %>%
       mutate(n = make_pretty(round(n)),
-             cases = make_pretty(cases), 
-             cases_rate =  digits(cases_rate * 10^5, 0),
-             hosp = make_pretty(hosp), 
-             hosp_rate =  digits(hosp_rate * 10^5, 1),
-             death = make_pretty(death), 
-             death_rate =  digits(death_rate * 10^5, 2)) %>%
+             cases = make_pretty(obs_cases), 
+             cases_rate =  digits(rate_cases * 10^5, 0),
+             hosp = make_pretty(obs_hosp), 
+             hosp_rate =  digits(rate_hosp * 10^5, 1),
+             death = make_pretty(obs_death), 
+             death_rate =  digits(rate_death * 10^5, 2)) %>%
       select(ageRange, status, manu, n, death, death_rate,  hosp, hosp_rate, cases, cases_rate)
     
       kableExtra::kbl(tab, col.names = c("Grupo de edada", "Vacunación", "Tipo de vacuna", "Número de personas", "Muertes", "Muertes por 100K por día",  "Hosp", "Hosp por 100K por día", "Casos", "Casos por 100K por día"),
@@ -323,25 +322,24 @@ make_outcome_tab <- function(tab, complete = TRUE, details = FALSE){
       kableExtra::kable_styling() %>%
       kableExtra::column_spec(1, width = "12em") %>%
       kableExtra::row_spec(which(tab$status=="No vacunados"), bold = FALSE, color = "black", background = status_colors[["UNV"]]) %>%
-      kableExtra::row_spec(which(tab$status=="Parcial"), bold = FALSE, color = "black", background = status_colors[["PAR"]]) %>%
-      kableExtra::row_spec(which(tab$status=="Vacunados sin booster"), bold = FALSE, color = "black", background = status_colors[["VAX"]]) %>%
-      kableExtra::row_spec(which(tab$status=="Vacunados con booster"), bold = FALSE, color = "black", background = status_colors[["BST"]]) %>%
+      kableExtra::row_spec(which(tab$status=="Vacunación parcial"), bold = FALSE, color = "black", background = status_colors[["PAR"]]) %>%
+      kableExtra::row_spec(which(tab$status=="Vacunación expirada"), bold = FALSE, color = "black", background = status_colors[["VAX"]]) %>%
+      kableExtra::row_spec(which(tab$status=="Vacunación al día"), bold = FALSE, color = "black", background = status_colors[["BST"]]) %>%
       kableExtra::column_spec(grep("rate", names(tab)), bold = TRUE)
   }
   else{
     tab <- tab %>% 
-      filter(complete_week == complete) %>%
       mutate(status = recode(status, UNV = "No vacunados", 
                              PAR= "Parcial", 
                              VAX="Vacunados sin booster", 
                              BST = "Vacunados con booster")) %>%
       mutate(n = make_pretty(round(n)),
-             cases = make_pretty(cases), 
-             cases_rate =  digits(cases_rate * 10^5, 0),
-             hosp = make_pretty(hosp), 
-             hosp_rate =  digits(hosp_rate * 10^5, 1),
-             death = make_pretty(death), 
-             death_rate =  digits(death_rate * 10^5, 2)) %>%
+             cases = make_pretty(obs_cases), 
+             cases_rate =  digits(rate_cases * 10^5, 0),
+             hosp = make_pretty(obs_hosp), 
+             hosp_rate =  digits(rate_hosp * 10^5, 1),
+             death = make_pretty(obs_death), 
+             death_rate =  digits(rate_death * 10^5, 2)) %>%
       select(ageRange, status, n,  death, death_rate, hosp, hosp_rate, cases, cases_rate)
     
     kableExtra::kbl(tab,col.names = c("Group de Edad", "Vacunación", "Número de personas",  "Muertes","Muertes por 100K por día",  "Hosp", "Hosp por 100K por día", "Casos", "Casos por 100K por día"),
@@ -349,9 +347,9 @@ make_outcome_tab <- function(tab, complete = TRUE, details = FALSE){
       kableExtra::kable_styling() %>%
       kableExtra::column_spec(1, width = "12em") %>%
       kableExtra::row_spec(which(tab$status=="No vacunados"), bold = FALSE, color = "black", background = status_colors[["UNV"]]) %>%
-      kableExtra::row_spec(which(tab$status=="Parcial"), bold = FALSE, color = "black", background = status_colors[["PAR"]]) %>%
-      kableExtra::row_spec(which(tab$status=="Vacunados sin booster"), bold = FALSE, color = "black", background = status_colors[["VAX"]]) %>%
-      kableExtra::row_spec(which(tab$status=="Vacunados con booster"), bold = FALSE, color = "black", background = status_colors[["BST"]]) %>%
+      kableExtra::row_spec(which(tab$status=="Vacunación parcial"), bold = FALSE, color = "black", background = status_colors[["PAR"]]) %>%
+      kableExtra::row_spec(which(tab$status=="Vacunación expirada"), bold = FALSE, color = "black", background = status_colors[["VAX"]]) %>%
+      kableExtra::row_spec(which(tab$status=="Vacunación al día"), bold = FALSE, color = "black", background = status_colors[["BST"]]) %>%
       kableExtra::column_spec(grep("rate", names(tab)), bold = TRUE)
   }
 }

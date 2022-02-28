@@ -162,8 +162,8 @@ ui <- fluidPage(
                                        "Dosis",
                                        choice = c("Agregadas" = "all",
                                                   "Primera" = "Primera",
-                                                  "Completa" = "Segunda",
-                                                  "Booster" = "Booster"),
+                                                  "Segunda" = "Segunda",
+                                                  "Tercera" = "Tercera"),
                                        selected = "all"),
                            selectInput("proveedor_manu",
                                        "Tipo de vacuna",
@@ -181,7 +181,7 @@ ui <- fluidPage(
                        sidebarLayout(
                          sidebarPanel(
                            dateRangeInput("tabla_range", "Periodo",
-                                          start = last_day - days(60),
+                                          start = last_day - days(30),
                                           end = last_day,
                                           format = "M-dd-yyyy",
                                           language = "es",
@@ -193,10 +193,10 @@ ui <- fluidPage(
                            DT::dataTableOutput("tabla")
                          )
                        )),
-                       tabPanel("FAQ",
-                                htmlOutput("importantInfo")
-                       )
-            ),
+              tabPanel("FAQ",
+                       htmlOutput("importantInfo")
+              )
+  ),
   htmlOutput("update"),
 )
               
@@ -209,14 +209,14 @@ server <- function(input, output, session) {
   
   output$titulo_2 <- renderText({
     load(file.path(rda_path, "dates.rda"))
-    paste("<p>Semana acabando", 
-          format(last_day_counts-weeks(2), "%B %d, %Y:"), "</p>")
+    paste("<p>Mes acabando", 
+          format(last_day_counts, "%B %d, %Y:"), "</p>")
     })
 
-  output$titulo_3 <- renderText({
-    load(file.path(rda_path, "dates.rda"))
-    paste("<p>Semana acabando", 
-          format(last_day_counts-weeks(1), "%B %d, %Y"), " (datos parciales):</p>")})
+  # output$titulo_3 <- renderText({
+  #   load(file.path(rda_path, "dates.rda"))
+  #   paste("<p>Semana acabando", 
+  #         format(last_day_counts-weeks(1), "%B %d, %Y"), " (datos parciales):</p>")})
   
   output$update <- renderText({
     paste0("<h4>Última actualización: ", format(the_stamp, "%B %d, %Y"), "</h4>")
@@ -239,68 +239,66 @@ server <- function(input, output, session) {
   output$summary_2 <- renderText({
     load(file.path(rda_path, "tabs.rda"))
     if(input$summary_type == "detail"){
-      make_outcome_tab(outcome_tab_details, complete = TRUE, details = TRUE)
+      make_outcome_tab(outcome_tab_details, details = TRUE)
     } else{
-      make_outcome_tab(outcome_tab, complete = TRUE, details = FALSE)
+      make_outcome_tab(outcome_tab, details = FALSE)
     }
   })
-  output$summary_3 <- renderText({
-    load(file.path(rda_path, "tabs.rda"))
-    
-    if(input$summary_type == "detail"){
-      make_outcome_tab(outcome_tab_details, complete = FALSE, details = TRUE)
-    } else{
-      make_outcome_tab(outcome_tab, complete = FALSE, details = FALSE)
-    }
-  })
+  # output$summary_3 <- renderText({
+  #   load(file.path(rda_path, "tabs.rda"))
+  #   
+  #   if(input$summary_type == "detail"){
+  #     make_outcome_tab(outcome_tab_details, complete = FALSE, details = TRUE)
+  #   } else{
+  #     make_outcome_tab(outcome_tab, complete = FALSE, details = FALSE)
+  #   }
+  # })
   
   
    output$muertes_plot <- renderPlot({
-     load(file.path(rda_path, "counts.rda"))
+     load(file.path(rda_path, "daily_counts.rda"))
      load(file.path(rda_path, "dates.rda"))
+     
+     daily_counts <- daily_counts %>% filter(outcome==input$event_type)
      
      the_title <- case_when(
        input$event_type == "death" ~ "Tasa de mortalidad por estado de vacunación",
        input$event_type == "hosp" ~ "Tasa de hospitalización por estado de vacunación",
        input$event_type == "cases" ~ "Casos por 100,000 por día por estado de vacunación")
      
-     if(input$event_agerange %in% c("all", "facet")){
-       counts <- filter(counts, ageRange != "0-4") %>%
-         mutate(ageRange = droplevels(ageRange))} else{
-           counts <- filter(counts, ageRange == input$event_agerange)
+     if(!input$event_agerange %in% c("all", "facet")){
+       daily_counts <- filter(daily_counts, ageRange == input$event_agerange)
      }
      
-     if(input$event_agerange == "all") counts$ageRange <- "all" 
+     if(input$event_agerange == "all") daily_counts$ageRange <- "all" 
      
-     the_k <- case_when(input$event_type == "death" ~ 60,
+     the_k <- case_when(input$event_type == "death" ~ 30,
                         input$event_type == "hosp" ~ 30,
                         input$event_type == "cases" ~ 14)
-     tmp <- counts %>% 
-       filter(status %in% c("VAX", "UNV", "BST")) %>%
-       filter(!(status == "BST" & manu == "JSN")) %>%
-       mutate(outcome = !!sym(input$event_type)) %>%
+     tmp <- daily_counts %>% 
+       filter(status != "Vacunación parcial") %>%
        group_by(date, status, manu, ageRange) %>%
-       summarize(outcome = sum(outcome), n=sum(n, na.rm=TRUE), .groups = "drop") %>%
+       summarize(obs = sum(obs), n=sum(poblacion, na.rm=TRUE), .groups = "drop") %>%
        group_by(status, manu, ageRange) %>% 
        mutate(denom =  ma7(date, n, k = the_k)$moving_avg) %>%
-       mutate(rate = ma7(date, outcome, k = the_k)$moving_avg/denom * 10^5) %>%
+       mutate(rate = ma7(date, obs, k = the_k)$moving_avg/denom * 10^5) %>%
        ungroup() %>%
        filter(date >= input$event_range[1] & date <= input$event_range[2]) %>%
        filter(denom > 1000) %>%
-       mutate(Booster = factor(ifelse(status != "BST",  "Sin", "Con"), levels = c("Sin", "Con"))) 
+       mutate(Vacunación = ifelse(status=="Vacunación expirada", "expirada", "al día"))
      
-       p <- tmp %>% ggplot(aes(date, rate, color = manu, lty = Booster)) +
-       geom_line(lwd = 1.25, alpha = 0.7) +
-       labs(y="Tasa por día por 100,000", x="Fecha", title = the_title, 
-            caption = paste("Basado en media móvil de", the_k,"días.\nArea gris contiene datos incompletos.")) +
-       scale_color_manual(
-         labels = c(UNV=manu_labels[["UNV"]], MOD=manu_labels[["MOD"]], PFR=manu_labels[["PFR"]],
-                    JSN=manu_labels[["JSN"]]),
-         values = c(UNV=manu_colors[["UNV"]], MOD=manu_colors[["MOD"]], PFR=manu_colors[["PFR"]],
-                    JSN=manu_colors[["JSN"]]), name="Vacuna:") +
-       theme_bw()+
-       theme(legend.position = "bottom", text = element_text(size = 15)) +
-       scale_x_date(date_labels = "%b", breaks = scales::breaks_width("1 month"))
+       p <- tmp %>% ggplot(aes(date, rate, color = manu, lty = Vacunación)) +
+         geom_line(lwd = 1.25, alpha = 0.7) +
+         labs(y="Tasa por día por 100,000", x="Fecha", title = the_title, 
+              caption = paste("Basado en media móvil de", the_k,"días.\nArea gris contiene datos incompletos.")) +
+         scale_color_manual(
+           labels = c(UNV=manu_labels[["UNV"]], MOD=manu_labels[["MOD"]], PFR=manu_labels[["PFR"]],
+                      JSN=manu_labels[["JSN"]]),
+           values = c(UNV=manu_colors[["UNV"]], MOD=manu_colors[["MOD"]], PFR=manu_colors[["PFR"]],
+                      JSN=manu_colors[["JSN"]]), name="Vacuna:") +
+         theme_bw()+
+         theme(legend.position = "bottom", text = element_text(size = 15)) +
+         scale_x_date(date_labels = "%b", breaks = scales::breaks_width("1 month"))
      
      if(input$event_agerange == "facet") p <- p + facet_wrap(~ageRange)
      if(input$event_scale == "log") p <- p + scale_y_continuous(trans = "log2")
@@ -319,26 +317,38 @@ server <- function(input, output, session) {
   })
   
   output$muertes_tabla <- DT::renderDataTable({
-    load(file.path(rda_path, "dat_cases.rda"))
+    load(file.path(rda_path, "dat_cases_vax.rda"))
     
-    dat_cases$ageRange_2 <- fct_collapse(dat_cases$ageRange, 
+    dat_cases_vax <- dat_cases_vax %>%
+      mutate(date = if_else(is.na(date) & !is.na(date_death), date_death, date)) %>%
+      filter(date>= first_day & date <= last_day) %>%
+      mutate(manu = factor(ifelse(is.na(manu_1), "UNV", as.character(manu_1)), levels= c("UNV", "MOD", "PFR", "JSN"))) %>%
+      mutate(status = case_when(
+        date > booster_date ~"BST",
+        date > vax_date ~ "VAX",
+        date > date_1 ~"PAR",
+        TRUE ~ "UNV")) 
+    
+    dat_cases_vax$status <- factor(dat_cases_vax$status, levels = c("UNV", "PAR", "VAX", "BST"))
+    
+    dat_cases_vax$ageRange_2 <- fct_collapse(dat_cases_vax$ageRange, 
                                          "18-44" = c("18-24", "25-29", "30-34", "35-39", "40-44"),
                                          "45-64" = c("45-49", "50-54", "55-59","60-64"),
                                          "65+" = c("65-69", "70-74", "75-79","80-84", "85+"))
     date_name <-  paste0("date_", input$event_type)
     
     if(!input$event_agerange %in% c("all", "facet")){
-      dat_cases <- filter(dat_cases, ageRange_2 == input$event_agerange)
+      dat_cases_vax <- filter(dat_cases_vax, ageRange_2 == input$event_agerange)
     } 
     
-    dat_cases$cases <- TRUE
-    dat_cases$date_cases <- dat_cases$date
-    ret <- dat_cases %>% 
+    dat_cases_vax$cases <- TRUE
+    dat_cases_vax$date_cases <- dat_cases_vax$date
+    ret <- dat_cases_vax %>% 
       filter(!!sym(input$event_type)) %>%
       mutate(date = !!sym(date_name)) %>%
-      filter(date >= input$event_range[1] & date <= input$event_range[2]) %>%
+    #  filter(date >= input$event_range[1] & date <= input$event_range[2]) %>%
       slice(1:1000) %>%
-      mutate(days = pmax(0, ifelse(manu=="JSN", as.numeric(date-date_1), as.numeric(date - date_2)))) %>%
+      mutate(days = pmax(0, as.numeric(date-vax_date))) %>%
       mutate(days = na_if(days, 0)) %>%
       mutate(booster = case_when(status == "BST" ~ "Sí",
                                  status == "VAX" ~ "No",
@@ -398,7 +408,7 @@ server <- function(input, output, session) {
              poblacion = make_pretty(round(poblacion))) %>%
       select(ageRange, gender, poblacion, onedose, full, faltan, immune, booster) %>%
       kbl(col.names = c("Grupo de Edad", "Sexo", "Población", "Una dosis", "Dosis completa", "Faltan", 
-                        "Dosis completa sin necesidad de Booster", "Con booster"),
+                        "Vacunción al día", "Con booster"),
                       align = c("c","c", rep("r", 9)))  %>%
       kable_styling()
   })
@@ -474,7 +484,7 @@ server <- function(input, output, session) {
              poblacion = make_pretty(round(poblacion))) %>%
       select(municipio, poblacion, onedose, full, faltan, immune, booster,
              opoblacion, oonedose, ofull, ofaltan, oimmune, obooster) %>%
-      setNames(c("Municipio", "Población", "Una dosis", "Dosis completa", "Faltan", "Dosis complete sin necesidad de Booster", "Con booster",
+      setNames(c("Municipio", "Población", "Una dosis", "Dosis completa", "Faltan", "Vacunación al día", "Con booster",
                  "opoblacion", "oonedose", "ofull", "ofaltan", "oimmune", "obooster"))%>%
       DT::datatable(rownames = FALSE,
                     options = list(dom = 't', pageLength = -1,
@@ -516,29 +526,18 @@ server <- function(input, output, session) {
       kableExtra::kable_styling()
   })
   output$tabla <- DT::renderDataTable({
-    load(file.path(rda_path, "counts.rda"))
+    load(file.path(rda_path, "daily_counts.rda"))
     
-    ret <- counts %>% filter(date >= input$tabla_range[1] & date <= input$tabla_range[2]) %>%
-      group_by(date, manu, status) %>%
-      summarize(cases = sum(cases), hosp = sum(hosp), 
-                death = sum(death), n=sum(n, na.rm=TRUE), .groups = "drop") %>%
-      group_by(manu, status) %>%
-      mutate(cases_rate = ma7(date, cases)$moving_avg/ma7(date, n)$moving_avg * 10^5,
-             hosp_rate = ma7(date, hosp)$moving_avg/ma7(date, n)$moving_avg * 10^5,
-             death_rate = ma7(date, death)$moving_avg/ma7(date, n)$moving_avg * 10^5) %>%
-      ungroup() %>%
-      arrange(desc(date), status, manu) %>%
-      mutate(status = recode(status, UNV = "No vacunados", PAR= "Parcial", VAX="Vacunados sin booster", BST = "Vacunado con booster")) %>%
-      mutate(manu = recode(as.character(manu), UNV = "", MOD = "Moderna", PFR = "Pfizer", JSN = "J & J")) %>%
-      mutate(n = make_pretty(round(n)),
-             cases_rate = digits(cases_rate),
-             hosp_rate =digits(hosp_rate),
-             death_rate = digits(death_rate)) %>%
-      select(date, status, manu, n, cases_rate, hosp_rate, death_rate, cases, hosp, death)
+    ret <- daily_counts %>% 
+      filter(date >= input$tabla_range[1] & date <= input$tabla_range[2]) %>%
+      pivot_wider(names_from = outcome, values_from = obs) %>%
+      mutate(poblacion = make_pretty(round(poblacion))) %>%
+      mutate(manu = recode(manu, "UNV"="", "MOD"="Moderna", "PFR" = "Pfizer", "JSN"="J&J")) %>%
+      select(date, ageRange, gender, status, manu, poblacion, cases, hosp, death) %>%
+      arrange(date, desc(ageRange), gender, status)
     
-    make_datatable(ret, align = c("r","c","c", rep("r",7)), nowrap = 1:3,
-                   col.names = c("Fecha", "Vacunación", "Tipo de vacuna", "Población",
-                                 "Casos (tasa) ", "Hosp (tasa)", "Muertes (tasa)",
+    make_datatable(ret, align = c("r", "r", "c", "c", "c", rep("r",4)), nowrap = 1:4,
+                   col.names = c("Fecha", "Grupo de edad", "Género", "Vacunación", "Tipo de vacuna", "Población",
                                  "Casos", "Hosp", "Muertes"))
   },
   server = FALSE
