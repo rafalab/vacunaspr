@@ -526,10 +526,9 @@ counts <- rbindlist(list(par, vax, bst, unvax), use.names = TRUE)
 counts[, outcome := factor(outcome, levels = c("cases", "hosp","death"))]
 counts[, status := factor(status, levels = c("UNV","PAR","VAX","BST"))]
 counts[, variant := fcase(date < make_date(2021, 6, 15), "alpha",
-                       date >= make_date(2021, 6, 15) & date<make_date(2021,12,15), "delta",
-                       date >= make_date(2021,12,15), "omicron")]
+                       date >= make_date(2021, 6, 15) & date < make_date(2021,12,8), "delta",
+                       date >= make_date(2021, 12, 8), "omicron")]
 counts[, day :=fifelse(status!="UNV", as.numeric(date - vax_date), 0)]
-
 
 
 

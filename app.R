@@ -26,7 +26,7 @@ ui <- fluidPage(
   tabsetPanel(id = "tabs",
               tabPanel("Resumen",
                        htmlOutput("fecha"),
-                       p("Los datos presentados en este dashboard han sido revisados. Por favor visite la ventana de FAQ para más detalles. "), 
+                       p("Los datos presentados en este dashboard han sido revisados. Por favor visite la ventana de FAQ para más detalles."), 
                        htmlOutput("summary_1"),
                        h4("Resumen de casos, hospitalizaciones y muertes"),
                        p("Los tamaños de los grupos son diferentes por lo cual no es informativo comparar totales sino las tasas (por 100K por día). Los totales no incluyen personas que han dado positivo a una prueba diagnóstica en los últimos 90 días. También tome en cuenta que los datos de vacunas tienen mayor rezago que los de la pruebas."),
@@ -270,6 +270,7 @@ server <- function(input, output, session) {
      
      if(!input$event_agerange %in% c("all", "facet")){
        daily_counts <- filter(daily_counts, ageRange == input$event_agerange)
+       the_title <- paste(the_title, "para grupo de edad", input$event_agerange)
      }
      
      if(input$event_agerange == "all") daily_counts$ageRange <- "all" 
@@ -672,24 +673,39 @@ server <- function(input, output, session) {
     " <h3> Información importante sobre el manejo de datos en este dashboard </h3>
   <br/> 
 
-Los datos presentados en este dashboard pueden cambiar según pasa el tiempo pues provienen de una base de datos viva sujeta a ediciones según nueva información se hace disponible. Además, como parte del proceso de organización y limpieza de datos, los analistas encargados de este dashboard pueden hacer modificaciones que entiendan pertinentes para mejorar la calidad de la información que aquí se presenta. 
+Los datos presentados en este dashboard pueden cambiar según pasa el tiempo pues provienen de una base de datos 
+viva sujeta a ediciones según nueva información se hace disponible. Además, como parte del proceso de organización y 
+limpieza de datos, los analistas encargados de este dashboard pueden hacer modificaciones que entiendan pertinentes 
+para mejorar la calidad de la información que aquí se presenta. 
 
-<h4> ¿Por qué hay diferencias entre los resúmenes de vacunas con el dashboard del Departamento de Salud? </h4>
-Como parte de una colaboración con el Programa de Vacunación del Departamento de Salud, logramos realizar un análisis detallado que llevamos a cabo durante febrero 2022 en el cual confirmamos que sobre 150,000 récords de vacunas contra COVID-19 en la base de datos de vacunas de Puerto Rico, el Sistema de Registro de Inmunizaciones (PREIS), que tiene cerca de 7 millones de récords de vacunas contra COVID-19, tenían errores de entrada que resultaban en subestimación de terceras dosis y de personas no vacunadas. Desarrollamos un programa informático (https://github.com/rafalab/fuzzypareo) que detecta la gran mayoría de estos errores y los corrige de manera local (no en el PREIS) antes de calcular los resúmenes presentados aquí. No obstante, las correcciones al PREIS se tienen que realizar en coordinación con los requisitos de los CDC, que toma más tiempo, y los datos que presenta el Departamento de Salud se obtienen directamente del PREIS.
+<h4> ¿Por qué hay diferencias entre los resúmenes de vacunas con eldashboard del Departamento de Salud? </h4>
+Como parte de una colaboración con el Programa de Vacunación del Departamento de Salud, logramos realizar un análisis detallado que llevamos a cabo 
+durante febrero 2022 en el cual confirmamos que sobre 150,000 récords de vacunas contra COVID-19 en la base de datos de vacunas de Puerto Rico, 
+el Sistema de Registro de Inmunizaciones (PREIS), que tiene cerca de 7 millones de récords de vacunas contra COVID-19, tenían errores de entrada
+que resultaban en subestimación de terceras dosis y de personas no vacunadas. Desarrollamos un programa informático (https://github.com/rafalab/fuzzypareo) 
+que detecta la gran mayoría de estos errores y los corrige de manera local (no en el PREIS) antes de calcular los resúmenes presentados aquí. 
+No obstante, las correcciones al PREIS se tienen que realizar en coordinación con los requisitos de los CDC, que toma más tiempo, 
+y los datos que presenta el Departamento de Salud se obtienen directamente del PREIS.
 <br/> <br/>
   
 <h4> Definiciones importantes </h4>
 <ul><li> Vacunas administradas: suma de todas las primeras dosis, segundas dosis, y dosis de refuerzo administradas en Puerto Rico. 
+Esto incluye personas que no son residentes de Puerto Rico. El resto de las definiciones solo incluye residentes de Puerto Rico.
 <br/> 
-</li><li> Personas con por lo menos una dosis: suma de todas las personas que se han puesto al menos una dosis. Note que todas las personas con más de una dosis están contempladas en esta suma. 
+</li><li> Personas con por lo menos una dosis: suma de todos los personas que se han puesto al menos una dosis. 
+Note que todas las personas con más de una dosis están contempladas en esta suma. 
 <br/> 
-</li><li> Personas con serie primaria completa: suma de todas las personas que se han puesto dos dosis de Pfizer o Moderna o una de Janssen y han transcurrido 14 días desde su última dosis. 
+</li><li> Personas con serie primaria completa: suma de todos los personas que se han puesto dos dosis de Pfizer o Moderna o una de Janssen 
+y han transcurrido 14 días desde su última dosis. 
 <br/> 
-</li><li> Personas con vacunación al día: suma de personas que con dosis completa que aún no necesitan dosis de refuerzo porque no han transcurrido 5 meses desde su segunda dosis de Moderna o Pfizer o 2 meses desde su primera dosis de Janssen. 
+</li><li> Personas con vacunación al día: suma de personas que se han puesto dosis de resfuerzo o 
+tienen dosis completa que aún no necesitan dosis de refuerzo porque 
+no han transcurrido 5 meses desde su segunda dosis de Moderna o Pfizer o 2 meses desde su primera dosis de Janssen. 
 <br/> 
 </li><li> Personas con boosters: suma de personas que completaron sus dosis de vacunación y se administraron su dosis de refuerzo. 
 <br/> 
-</li><li> Personas con serie primaria completa con necesidad de booster (vacunación expirada): suma de personas que ya completaron sus dosis de vacunación pero han transcurrido 5 meses (Pfizer o Moderna) o 2 meses (Janssen) y no se han puesto su dosis de refuerzo. 
+</li><li> Personas con serie primaria completa con necesidad de booster (vacunación expirada): suma de personas 
+que ya completaron sus dosis de vacunación pero han transcurrido 5 meses (Pfizer o Moderna) o 2 meses (Janssen) y no se han puesto su dosis de refuerzo. 
 <br/> 
 </li><li> Menores (5-11 años) con por lo menos 1 dosis: suma de personas entre 5-11 años que cuentan con al menos una dosis. 
 <br/> 
@@ -704,12 +720,17 @@ Como parte de una colaboración con el Programa de Vacunación del Departamento 
 
 <h4> Sobre el cálculo de tasas </h4>
 
-Para calcular las tasas de cada evento por estado de vacunación y grupo de edad es necesario realizar un pareo entre la base de datos del BioPortal y la base de datos del PREIS. Este proceso carece de un identificador único común entre las bases, por lo que se ha desarrollado un algoritmo que realiza el pareo utilizando variables disponibles. Al momento, hemos descubierto que el algoritmo es 99% efectivo en identificar correctamente a las personas. Naturalmente, existen rezagos de entrada de datos en ambas bases, que convergen en el pareo y resulta en que las tasa de días recientes cambien mientras entran los datos. 
+Para calcular las tasas de cada evento por estado de vacunación y grupo de edad es necesario realizar un pareo entre la base de datos del BioPortal y 
+la base de datos del PREIS. 
+Este proceso carece de un identificador único común entre las bases, por lo que se ha desarrollado un algoritmo que realiza el pareo utilizando variables disponibles. Al momento, hemos descubierto que el algoritmo es 99% efectivo en identificar correctamente a las personas. Naturalmente, existen rezagos de entrada de datos en ambas bases, que convergen en el pareo y resulta en que las tasa de días recientes cambien mientras entran los datos. 
   
 <h4> Estimados poblacionales </h4>
 
-Los estimados poblacionales que se usan en este dashboard viene de <i> Vintage 2020 Population Estimates </i> para Puerto Rico publicados por el <i> U.S. Census Bureau </i> (<a> https://www.census.gov/programs-surveys/popest/technical-documentation/research/evaluation-estimates/2020-evaluation-estimates/2010s-detail-puerto-rico.html </a>). 
-
+Los estimados poblacionales que se usan en este dashboard viene de <i> Vintage 2020 Population Estimates </i> para Puerto Rico publicados 
+por el <i> U.S. Census Bureau</i> 
+(<a> https://www.census.gov/programs-surveys/popest/technical-documentation/research/evaluation-estimates/2020-evaluation-estimates/2010s-detail-puerto-rico.html </a>). Si
+el número de vacunados para un grupo demográfico supera el estimado poblacional de ese grupo demográfico, usamos el numero de vacunados como el tamaño de la
+población. Esto ocurre para algunos grupos de edad en algunos municipios.
     
     "})
 }
