@@ -618,8 +618,8 @@ summary_tab <- data.frame(names = c("Vacunas administradas",
                                     "Menores (5-11 años) con por lo menos 1 dosis",
                                     "Menores (5-11 años) con serie primaria completa"),
                   total = c(administradas, the_immune, primera, completa, booster, lost, booster_ped, lost_ped, pediatric_primera, pediatric_completa),
-                  porciento = c(NA, primera_prop, completa_prop,  the_immune_prop, booster_prop,  lost_prop, booster_ped_prop, lost_ped_prop,  pediatric_primera_prop, pediatric_completa_prop),
-                  tasas = c(administradas_tasa, tasas$onedose, tasas$full, tasas$immune, tasas$booster,  tasas$lost, tasas_ped_2$booster, tasas_ped_2$lost, tasas_ped$onedose, tasas_ped$full))
+                  porciento = c(NA, the_immune_prop, primera_prop, completa_prop,  booster_prop,  lost_prop, booster_ped_prop, lost_ped_prop,  pediatric_primera_prop, pediatric_completa_prop),
+                  tasas = c(administradas_tasa, tasas$immune, tasas$onedose, tasas$full,  tasas$booster,  tasas$lost, tasas_ped_2$booster, tasas_ped_2$lost, tasas_ped$onedose, tasas_ped$full))
 
 
 # collapse age groups to minimize denominator variance --------------------
