@@ -553,7 +553,7 @@ server <- function(input, output, session) {
     load(file.path(rda_path, "population-tabs.rda"))
     
     the_title <- case_when(
-      input$graficas_dose == "full" ~ "Cantidad de personas que completan serie de vacunación por día",
+      input$graficas_dose == "full" ~ "Cantidad de personas que completan serie primaria de vacunación por día",
       input$graficas_dose == "onedose" ~ "Cantidad de personas con una dosis por día",
       input$graficas_dose == "booster" ~ "Cantidad de personas con dosis de refuerzo por día", 
       input$graficas_dose == "immune" ~ "Cantidad de personas sin necesidad de dosis de refuerzo por día")
@@ -691,37 +691,29 @@ y los datos que presenta el Departamento de Salud se obtienen directamente del P
 <ul><li> Vacunas administradas: suma de todas las primeras dosis, segundas dosis, y dosis de refuerzo administradas en Puerto Rico. 
 Esto incluye personas que no son residentes de Puerto Rico. El resto de las definiciones solo incluye residentes de Puerto Rico.
 <br/> 
+</li><li> Personas con <i> vacunación al día </i>: suma de personas que se han puesto dosis de resfuerzo o 
+tienen serie primaria completa que aún no necesitan dosis de refuerzo porque 
+no han transcurrido 5 meses desde su segunda dosis de Moderna o Pfizer o 2 meses desde su primera dosis de Janssen. 
+<br/> 
 </li><li> Personas con por lo menos una dosis: suma de todos los personas que se han puesto al menos una dosis. 
 Note que todas las personas con más de una dosis están contempladas en esta suma. 
 <br/> 
 </li><li> Personas con serie primaria completa: suma de todos los personas que se han puesto dos dosis de Pfizer o Moderna o una de Janssen 
 y han transcurrido 14 días desde su última dosis. 
 <br/> 
-</li><li> Personas con vacunación al día: suma de personas que se han puesto dosis de resfuerzo o 
-tienen dosis completa que aún no necesitan dosis de refuerzo porque 
-no han transcurrido 5 meses desde su segunda dosis de Moderna o Pfizer o 2 meses desde su primera dosis de Janssen. 
-<br/> 
 </li><li> Personas con boosters: suma de personas que completaron sus dosis de vacunación y se administraron su dosis de refuerzo. 
 <br/> 
-</li><li> Personas con serie primaria completa con necesidad de booster (vacunación expirada): suma de personas 
+</li><li> Personas con serie primaria completa con necesidad de booster (<i>vacunación expirada </i>): suma de personas 
 que ya completaron sus dosis de vacunación pero han transcurrido 5 meses (Pfizer o Moderna) o 2 meses (Janssen) y no se han puesto su dosis de refuerzo. 
-<br/> 
-</li><li> Menores (5-11 años) con por lo menos 1 dosis: suma de personas entre 5-11 años que cuentan con al menos una dosis. 
-<br/> 
-</li><li> Menores (5-11 años) con serie primaria completa:  suma de personas entre 5-11 años que cuentan con sus dos dosis y han transcurrido 14 días desde su última dosis. 
 <br/> 
 </li><li> Vacunación <i>parcial</i> se refiere a aquellas personas que han iniciado su serie de vacunación pero aún no se consideran como vacunados por no haber transcurrido 14 días luego de su última dosis requerida. 
 <br/>
-</li><li> <i>Vacunados</i> son aquellas personas que han completado su serie de vacunación: han transcurrido 14 días luego de su última dosis requerida.
-<br/>
-</li><li> Las personas con booster son aquellas personas que se han puesto sus dosis de refuerzo y han transcurrido 14 días desde la dosis de refuerzo. 
 </li></ul>
 
-<h4> Sobre el cálculo de tasas </h4>
+<h4> Sobre la identificación de eventos de COVID-19 (casos, hospitalizaciones y muertes) en personas vacunadas </h4>
 
-Para calcular las tasas de cada evento por estado de vacunación y grupo de edad es necesario realizar un pareo entre la base de datos del BioPortal y 
-la base de datos del PREIS. 
-Este proceso carece de un identificador único común entre las bases, por lo que se ha desarrollado un algoritmo que realiza el pareo utilizando variables disponibles. Al momento, hemos descubierto que el algoritmo es 99% efectivo en identificar correctamente a las personas. Naturalmente, existen rezagos de entrada de datos en ambas bases, que convergen en el pareo y resulta en que las tasa de días recientes cambien mientras entran los datos. 
+Para estudiar los eventos de COVID-19 por estado de vacunación y grupo de edad se utiliza la fecha de la prueba diagnóstica positiva relacionada al evento. Además, es necesario realizar un pareo entre la base de datos del BioPortal y 
+la base de datos del PREIS. Este proceso carece de un identificador único común entre las bases, por lo que se ha desarrollado un programa informático (<a> https://github.com/rafalab/fuzzypareo </a>) que realiza el pareo utilizando variables disponibles. Al momento, hemos descubierto que el programa es 99% efectivo en identificar correctamente a las personas. Naturalmente, existen rezagos de entrada de datos en ambas bases, que convergen en el pareo y resulta en que las métricas de días recientes cambien mientras entran los datos. 
   
 <h4> Estimados poblacionales </h4>
 
