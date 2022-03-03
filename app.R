@@ -211,8 +211,8 @@ server <- function(input, output, session) {
   
   output$titulo_2 <- renderText({
     load(file.path(rda_path, "dates.rda"))
-    paste("<p>Mes acabando", 
-          format(last_day_counts, "%B %d, %Y:"), "</p>")
+    paste("<p>4 semanas acabando", 
+          format(last_day_counts-days(14), "%B %d, %Y:"), "</p>")
     })
 
   # output$titulo_3 <- renderText({

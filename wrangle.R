@@ -657,7 +657,7 @@ daily_counts <- daily_counts[order(date)]
 ## Compute cases, hosp and death rates
 ## Include other genders in totals
 tmp <- daily_counts %>%
-  filter( date > last_day_counts - days(30) & date<=last_day_counts) 
+  filter( date > last_day_counts - days(14) - days(28) & date<=last_day_counts - days(14)) 
 
 outcome_tab_totals <- tmp %>%
   group_by(outcome, ageRange, status, manu) %>%
@@ -710,7 +710,6 @@ outcome_tab <- left_join(outcome_tab_totals, outcome_tab_rates,
 #   summarize(total = sum(n, na.rm=TRUE), .groups = "drop")  
 
 #outcome_tab <- left_join(outcome_tab, totals, by = c("manu", "status"))
-
 
 save(proveedores, file=file.path(rda_path ,"proveedores.rda"))
 save(daily_counts, file=file.path(rda_path ,"daily_counts.rda"))
