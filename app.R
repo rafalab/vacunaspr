@@ -270,7 +270,7 @@ server <- function(input, output, session) {
      
      if(!input$event_agerange %in% c("all", "facet")){
        daily_counts <- filter(daily_counts, ageRange == input$event_agerange)
-       the_title <- paste(the_title, "para grupo de edad", input$event_agerange)
+       the_title <- paste(the_title, "para el grupo de edad", input$event_agerange, "años")
      }
      
      if(input$event_agerange == "all") daily_counts$ageRange <- "all" 
@@ -678,11 +678,11 @@ viva sujeta a ediciones según nueva información se hace disponible. Además, c
 limpieza de datos, los analistas encargados de este dashboard pueden hacer modificaciones que entiendan pertinentes 
 para mejorar la calidad de la información que aquí se presenta. 
 
-<h4> ¿Por qué hay diferencias entre los resúmenes de vacunas con eldashboard del Departamento de Salud? </h4>
+<h4> ¿Por qué hay diferencias entre los resúmenes de vacunas con el dashboard del Departamento de Salud? </h4>
 Como parte de una colaboración con el Programa de Vacunación del Departamento de Salud, logramos realizar un análisis detallado que llevamos a cabo 
 durante febrero 2022 en el cual confirmamos que sobre 150,000 récords de vacunas contra COVID-19 en la base de datos de vacunas de Puerto Rico, 
 el Sistema de Registro de Inmunizaciones (PREIS), que tiene cerca de 7 millones de récords de vacunas contra COVID-19, tenían errores de entrada
-que resultaban en subestimación de terceras dosis y de personas no vacunadas. Desarrollamos un programa informático (https://github.com/rafalab/fuzzypareo) 
+que resultaban en subestimación de terceras dosis y de personas no vacunadas. Desarrollamos un programa informático (<a> https://github.com/rafalab/fuzzypareo </a>) 
 que detecta la gran mayoría de estos errores y los corrige de manera local (no en el PREIS) antes de calcular los resúmenes presentados aquí. 
 No obstante, las correcciones al PREIS se tienen que realizar en coordinación con los requisitos de los CDC, que toma más tiempo, 
 y los datos que presenta el Departamento de Salud se obtienen directamente del PREIS.
