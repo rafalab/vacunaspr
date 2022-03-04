@@ -101,7 +101,7 @@ ui <- fluidPage(
                                        "Grupo de Edad",
                                        choice = c("Agregados" = "all",
                                                   "Todos" = "facet",
-                                                  rev(age_levels[-1])),
+                                                  rev(dashboard_age_levels[-1])),
                                        selected = "all"),
                            dateRangeInput("graficas_range",
                                           "Periodo",
@@ -127,7 +127,7 @@ ui <- fluidPage(
                            selectInput("municipio_agerange",
                                        "Grupo de Edad",
                                        choice = c("Agregados" = "all",
-                                                  rev(age_levels[-1])),
+                                                  rev(dashboard_age_levels[-1])),
                                        selected = "all"),
                            width = 3),
                          mainPanel(
@@ -157,7 +157,7 @@ ui <- fluidPage(
                            selectInput("proveedor_agerange",
                                        "Grupo de Edad",
                                        choice = c("Agregados" = "all",
-                                                  age_levels[-1]),
+                                                  dashboard_age_levels[-1]),
                                        selected = "Todos"),
                            selectInput("proveedor_dose",
                                        "Dosis",
@@ -422,11 +422,12 @@ server <- function(input, output, session) {
   output$mapa <- renderPlot({
     load(file.path(rda_path, "piramide.rda"))
     load(file.path(rda_path, "map.rda"))
+    
     tab <- piramide_tab %>%
       filter(!municipio %in% c("Todos", "No reportados"))
     
-    min_rate <- .40
-    max_rate <- .70
+    min_rate <- .5
+    max_rate <-  1
 
     if(input$municipio_agerange != "all"){
       tab <- tab %>% filter(ageRange == input$municipio_agerange)
@@ -551,10 +552,8 @@ server <- function(input, output, session) {
   
   
   output$people_plot <- renderPlot({
-    
     load(file.path(rda_path, "daily_vax_counts.rda"))
-    load(file.path(rda_path, "population-tabs.rda"))
-    
+
     the_title <- case_when(
       input$graficas_dose == "full" ~ "Cantidad de personas que completan serie primaria de vacunación por día",
       input$graficas_dose == "onedose" ~ "Cantidad de personas con una dosis por día",
