@@ -325,12 +325,12 @@ server <- function(input, output, session) {
     dat_cases_vax <- dat_cases_vax %>%
       mutate(date = if_else(is.na(date) & !is.na(date_death), date_death, date)) %>%
       filter(date>= first_day & date <= last_day) %>%
-      mutate(manu = factor(ifelse(is.na(manu_1), "UNV", as.character(manu_1)), levels= c("UNV", "MOD", "PFR", "JSN"))) %>%
       mutate(status = case_when(
         date > booster_date ~"BST",
         date > vax_date ~ "VAX",
         date > date_1 ~"PAR",
-        TRUE ~ "UNV")) 
+        TRUE ~ "UNV")) %>%
+      mutate(manu = factor(ifelse(status == "UNV", "UNV", as.character(manu_1)), levels= c("UNV", "MOD", "PFR", "JSN"))) 
     
     dat_cases_vax$status <- factor(dat_cases_vax$status, levels = c("UNV", "PAR", "VAX", "BST"))
     
@@ -349,24 +349,27 @@ server <- function(input, output, session) {
     ret <- dat_cases_vax %>% 
       filter(!!sym(input$event_type)) %>%
       mutate(date = !!sym(date_name)) %>%
-    #  filter(date >= input$event_range[1] & date <= input$event_range[2]) %>%
+      filter(date >= input$event_range[1] & date <= input$event_range[2]) %>%
       slice(1:1000) %>%
-      mutate(days = pmax(0, as.numeric(date-vax_date))) %>%
+      mutate(days = pmax(0, as.numeric(date_cases-vax_date))) %>%
       mutate(days = na_if(days, 0)) %>%
-      mutate(booster = case_when(status == "BST" ~ "Sí",
-                                 status == "VAX" ~ "No",
+      mutate(booster_days = pmax(0, as.numeric(date_cases-booster_date))) %>%
+      mutate(booster_days = na_if(booster_days, 0)) %>%
+      mutate(booster = case_when(status == "BST" ~ as.character(booster_manu),
+                                 status == "VAX" ~ "",
                                  TRUE ~ "")) %>%
-      select(date, ageRange, gender, status, manu, days, booster) %>%
+      select(date, ageRange, gender, status, manu, days, booster, booster_days) %>%
       mutate(status = as.character(recode(status, UNV = "No vacunado", PAR= "Parcial", VAX="Vacunado", BST = "Vacunado"))) %>%
       mutate(status = ifelse(gender == "F" & status == "Vacunado", "Vacunada", status)) %>%
       mutate(status = ifelse(gender == "F" & status == "No vacunado", "No vacunada", status)) %>%
-      mutate(manu = recode(as.character(manu), UNV = "", MOD = "Moderna", PFR = "Pfizer", JSN = "J & J"))
+      mutate(manu = recode(as.character(manu), UNV = "", MOD = "Moderna", PFR = "Pfizer", JSN = "J & J")) %>%
+      mutate(booster = recode(as.character(booster), MOD = "Moderna", PFR = "Pfizer", JSN = "J & J"))
      
     make_datatable(ret, 
                    col.names = c("Fecha", "Grupo de edad", "Sexo", "Vacunación", 
                                  "Tipo de vacuna", "Días desde completar dosis", 
-                                 "Booster"),
-                   align = c("r", "c", "c", "c", "c", "r", "r"),
+                                 "Booster", "Días desde el booster"),
+                   align = c("r", "c", "c", "c", "c", "r", "r","r"),
                    nowrap = 1:3)
     },
   server = FALSE)
