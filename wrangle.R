@@ -355,19 +355,18 @@ rm(daily_counts_booster_age_gender_manu,
 # Cases -------------------------------------------------------------------
 
 ## remove correctional cases to avoid bias introduced by outbreak
-# dat_vax <- dat_vax[(is.na(proveedor_1) | proveedor_1!="Correccional") &
-#                      (is.na(proveedor_2) | proveedor_2!="Correccional"),]
-# dat_cases_vax <- dat_cases_vax[(is.na(proveedor_1) | proveedor_1!="Correccional") &
-#                                  (is.na(proveedor_2) | proveedor_2!="Correccional"),]
-
+dat_vax <- dat_vax[(is.na(proveedor_1) | proveedor_1!="Correccional") &
+                     (is.na(proveedor_2) | proveedor_2!="Correccional"),]
+dat_cases_vax <- dat_cases_vax[(is.na(proveedor_1) | proveedor_1!="Correccional") &
+                                 (is.na(proveedor_2) | proveedor_2!="Correccional"),]
 
 ## define status and manufacturers
 dat_cases_vax[, manu := factor(fifelse(is.na(manu_1), "UNV", as.character(manu_1)), levels=manu_levels)]
 dat_cases_vax[, status := "UNV"]
-dat_cases_vax[date > date_1, status := "PAR"]
-dat_cases_vax[date > vax_date, status := "VAX"]
-dat_cases_vax[date > booster_date, status := "BST"]
-dat_cases_vax[date <= date_1, manu := "UNV"]
+dat_cases_vax[date >= date_1, status := "PAR"]
+dat_cases_vax[date >= vax_date, status := "VAX"]
+dat_cases_vax[date >= booster_date, status := "BST"]
+dat_cases_vax[date < date_1, manu := "UNV"]
 dat_cases_vax$status <- factor(dat_cases_vax$status, levels = c("UNV", "PAR", "VAX", "BST"))
 
 ## Compute number of unvaccinated that were suceuptible
@@ -388,21 +387,17 @@ pop_susceptible[, poblacion := poblacion-cases]
 pop_susceptible[, cases:=NULL]
 
 
-
 ### Compute number with and without booster for each day after vaccinated
-the_ndays <- as.numeric(last_day - min(dat_vax$vax_date, na.rm = TRUE))
-the_booster_ndays <- as.numeric(last_day - first_booster_day)
-
-compute_date_comb_counts <- function(tab, ndays = the_ndays, other_date = "booster_date"){
+compute_date_comb_counts <- function(tab, other_date = "booster_date"){
   the_date <- unique(tab$date)
-  all_dates <- data.table(tmp = seq(the_date, min(the_date + the_ndays, last_day), "days"))
+  all_dates <- data.table(tmp = seq(the_date, last_day, "days"))
   setnames(all_dates, "tmp", other_date)
   ind <- !is.na(tab[[other_date]])
   ret <- tab[ind, .(poblacion = .N), keyby = other_date]
   ret <- merge(all_dates, ret, by = other_date, all.x = TRUE)
   ret[is.na(ret)] <- 0
   ret <- ret[, poblacion := cumsum(poblacion)]
-  ret[, poblacion := nrow(tab) - poblacion]
+  ret[, poblacion := nrow(tab) - poblacion]  
   setnames(ret, other_date, "date")
   return(ret)
 }
@@ -410,7 +405,7 @@ compute_date_comb_counts <- function(tab, ndays = the_ndays, other_date = "boost
 ## population of vaccinated without booster for each day and date of vaccination
 dat_vax[, date := vax_date] ##make date vax_date for compute_date_comb_counts
 pop_vax <- dat_vax[!is.na(vax_date) & vax_date <= last_day &
-                     gender %in% c("F", "M") & ageRange_1 != "0-4",
+                     gender %in% c("F", "M") & vax_ageRange != "0-4",
                    compute_date_comb_counts(tab = .SD), 
                    keyby = c("vax_date", "manu_1", "vax_ageRange", "gender")]
 
@@ -421,9 +416,9 @@ pop_vax$ageRange <- factor(pop_vax$ageRange, levels = age_levels)
 pop_vax <- pop_vax[order(manu, ageRange, gender, date, vax_date)]
 #pop_vax %>% group_by(date,ageRange, manu) %>% summarize(n=sum(poblacion)) %>% ggplot(aes(date,n,color=manu))+geom_line()+facet_wrap(~ageRange)
 
-dat_vax[, date := date_1] ##make date vax_date for compute_date_comb_counts
 
 ## population of partially vaccinated
+dat_vax[, date := date_1] ##make date date_1 for compute_date_comb_counts
 pop_par <- dat_vax[!is.na(date_1) & date_1 <= last_day &
                      gender %in% c("F", "M") & ageRange_1 != "0-4",
                    compute_date_comb_counts(tab = .SD, other_date = "vax_date"), 
@@ -477,6 +472,8 @@ pop_unvax <- pop_unvax[,c("date", "ageRange","gender", "poblacion")]
 daily_counts_booster_age_gender_manu <- dat_vax[!is.na(booster_date), .(poblacion = .N),
                                                 keyby = .(booster_date, booster_ageRange, gender, manu_1, booster_manu)]
 names(daily_counts_booster_age_gender_manu) <- c("booster_date", "booster_ageRange", "gender", "manu_1", "booster_manu", "poblacion")
+
+the_booster_ndays <- as.numeric(last_day - first_booster_day)
 
 all_dates <-  seq(first_booster_day, last_day, "days")
 all_bst_combs <- CJ(date = all_dates,
