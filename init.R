@@ -15,7 +15,7 @@ if(Sys.info()["nodename"] == "fermat.dfci.harvard.edu"){
 Sys.setlocale("LC_TIME", "es_ES")
 
 
-load(file.path(rda_path, "dates.rda"))
+load(file.path(rda_path, "dashboard-dates.rda"))
 
 status_colors <- c(UNV = RColorBrewer::brewer.pal(8, "Greys")[5],
                    PAR = RColorBrewer::brewer.pal(8, "Greys")[4], 

@@ -204,19 +204,19 @@ ui <- fluidPage(
 server <- function(input, output, session) {
     
   output$fecha <- renderText({
-    load(file.path(rda_path, "dates.rda"))
+    load(file.path(rda_path, "dashboard-dates.rda"))
     paste0("<h4>Datos para ", 
            format(last_day, "%B %d, %Y:"), "</h4>")})
   
   
   output$titulo_2 <- renderText({
-    load(file.path(rda_path, "dates.rda"))
+    load(file.path(rda_path, "dashboard-dates.rda"))
     paste("<p>4 semanas acabando", 
           format(last_day_counts-days(14), "%B %d, %Y:"), "</p>")
     })
 
   # output$titulo_3 <- renderText({
-  #   load(file.path(rda_path, "dates.rda"))
+  #   load(file.path(rda_path, "dashboard-dates.rda"))
   #   paste("<p>Semana acabando", 
   #         format(last_day_counts-weeks(1), "%B %d, %Y"), " (datos parciales):</p>")})
   
