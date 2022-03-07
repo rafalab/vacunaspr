@@ -716,21 +716,33 @@ outcome_tab <- left_join(outcome_tab_totals, outcome_tab_rates,
 
 #outcome_tab <- left_join(outcome_tab, totals, by = c("manu", "status"))
 
+collapse_age_no_copy <- function(tab, vars){
+  cols <- setdiff(names(tab), vars)
+  tab[, ageRange := forcats::fct_collapse(ageRange, 
+                                          "18-29" = c("18-24", "25-29"),
+                                          "30-39" = c("30-34", "35-39"),
+                                          "40-59" = c("40-44", "45-49"),
+                                          "50-59" = c("50-54", "55-59"),
+                                          "60-69" = c("60-64", "65-69"),
+                                          "70-79" = c("70-74", "75-79"),
+                                          "80+" = c("80-84", "85+"))]
+  ret <- tab[, lapply(.SD, sum), keyby = cols, .SDcols=vars]
+  return(ret)
+}
 
 ### collapse ageRanges
-odaily_vax_counts <- copy(daily_vax_counts)
 save(proveedores, file=file.path(rda_path ,"proveedores.rda"))
 save(daily_counts, file=file.path(rda_path ,"daily_counts.rda"))
 save(counts, file=file.path(rda_path ,"counts.rda"))
 save(summary_tab, outcome_tab, outcome_tab_details, file=file.path(rda_path ,"tabs.rda"))
-poblacion <- collapse_age(poblacion, vars = "n")
-poblacion_muni <- collapse_age(poblacion_muni, vars = "n")
+poblacion <- collapse_age_no_copy(poblacion, vars = "n")
+poblacion_muni <- collapse_age_no_copy(poblacion_muni, vars = "n")
 save(poblacion, poblacion_muni, file = file.path(rda_path ,"poblacion.rda"))
-daily_vax_counts <- collapse_age(daily_vax_counts, vars = c("onedose", "full", "booster","lost"))
-pop_by_age_gender<-collapse_age(pop_by_age_gender, "poblacion")
+daily_vax_counts <- collapse_age_no_copy(daily_vax_counts, vars = c("onedose", "full", "booster","lost"))
+pop_by_age_gender<-collapse_age_no_copy(pop_by_age_gender, "poblacion")
 save(daily_vax_counts, pop_by_age_gender, file = file.path(rda_path, "daily_vax_counts.rda"))
-daily_vax_counts_by_municipio <- collapse_age(daily_vax_counts_by_municipio, vars = c("onedose", "full", "booster","lost"))
-pop_by_age_gender_municipio <-collapse_age(pop_by_age_gender_municipio, "poblacion")
+daily_vax_counts_by_municipio <- collapse_age_no_copy(daily_vax_counts_by_municipio, vars = c("onedose", "full", "booster","lost"))
+pop_by_age_gender_municipio <-collapse_age_no_copy(pop_by_age_gender_municipio, "poblacion")
 save(pop_by_age_gender_municipio, daily_vax_counts_by_municipio, file = file.path(rda_path, "daily_vax_counts_by_municipio.rda"))
 immune <- collapse_age(immune, vars = "n")
 save(immune, file = file.path(rda_path ,"immune.rda"))
