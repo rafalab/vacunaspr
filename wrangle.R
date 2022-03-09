@@ -18,6 +18,20 @@ collapse_age <- function(tab, vars){
   return(ret)
 }
 
+collapse_age_no_copy <- function(tab, vars){
+  cols <- setdiff(names(tab), vars)
+  tab[, ageRange := forcats::fct_collapse(ageRange, 
+                                          "18-29" = c("18-24", "25-29"),
+                                          "30-39" = c("30-34", "35-39"),
+                                          "40-59" = c("40-44", "45-49"),
+                                          "50-59" = c("50-54", "55-59"),
+                                          "60-69" = c("60-64", "65-69"),
+                                          "70-79" = c("70-74", "75-79"),
+                                          "80+" = c("80-84", "85+"))]
+  ret <- tab[, lapply(.SD, sum), keyby = cols, .SDcols=vars]
+  return(ret)
+}
+
 ## if on the server get the latest data
 if(Sys.info()["nodename"] == "fermat.dfci.harvard.edu"){
   rda_path <- "/homes10/rafa/dashboard/vacunaspr/rdas"
@@ -35,6 +49,7 @@ first_jnj_booster_day <- make_date(2021, 10, 22)
 
 # Load data ---------------------------------------------------------------
 
+message("Wrangling vaccine data.")
 dates_rda_variables <- load(file.path(rda_path, "dates.rda"))
 
 load(file.path(rda_path, "dat_vax.rda"))
@@ -64,8 +79,11 @@ all_combs_muni <- CJ(date = all_dates$date,
                 municipio = muni_levels)
 
 # daily_vax_counts --------------------------------------------------------
+cat("Computing daily vax counts: ")
 
 ## Fully vaxed
+cat("fully vaxed, ")
+
 daily_counts_vax_age_gender_manu <- dat_vax[!is.na(vax_date), .(full = .N),
                                             keyby = .(vax_date, vax_ageRange, gender, manu_1)]
 names(daily_counts_vax_age_gender_manu) <- c("date", "ageRange", "gender", "manu", "full")
@@ -76,6 +94,8 @@ counts_vax_age_gender_manu[, full := cumsum(full), keyby = .(ageRange, gender, m
 setnames(counts_vax_age_gender_manu, "full", "n")
 
 ## One dose
+cat("one dose, ")
+
 daily_counts_onedose_age_gender_manu <- dat_vax[!is.na(date_1), .(onedose = .N),
                                             keyby = .(date_1, ageRange_1, gender, manu_1)]
 names(daily_counts_onedose_age_gender_manu) <- c("date", "ageRange", "gender", "manu", "onedose")
@@ -88,6 +108,8 @@ counts_onedose_age_gender_manu[, onedose := cumsum(onedose), keyby = .(ageRange,
 setnames(counts_onedose_age_gender_manu, "onedose", "n")
 
 ## Partially vaxed
+cat("partial, ")
+
 counts_partial_age_gender_manu<- merge(counts_vax_age_gender_manu, 
                                        counts_onedose_age_gender_manu, 
                                        all = TRUE, by = c("date", "ageRange", "gender", "manu"))
@@ -95,6 +117,8 @@ counts_partial_age_gender_manu[ , n := n.y - n.x]
 counts_partial_age_gender_manu <- counts_partial_age_gender_manu[, !c("n.y", "n.x")]
 
 ## Boosters
+cat("booster, ")
+
 daily_counts_booster_age_gender_manu <- dat_vax[!is.na(booster_date), .(booster = .N),
                                                 keyby = .(booster_date, booster_ageRange, gender, booster_manu)]
 names(daily_counts_booster_age_gender_manu) <- c("date", "ageRange", "gender", "manu", "booster")
@@ -105,6 +129,8 @@ counts_booster_age_gender_manu[, booster := cumsum(booster), keyby = .(ageRange,
 setnames(counts_booster_age_gender_manu, "booster", "n")
 
 ## Lost original immunnity
+cat("lost immuninty.\n")
+
 daily_counts_lost_age_gender_manu <- dat_vax[!is.na(last_immune_date), .(lost = .N),
                                             keyby = .(last_immune_date, vax_ageRange, gender, manu_1)]
 names(daily_counts_lost_age_gender_manu) <- c("date", "ageRange", "gender", "manu", "lost")
@@ -134,7 +160,11 @@ daily_vax_counts$ageRange <- factor(daily_vax_counts$ageRange, levels = age_leve
 
 # daily_vax_counts_by_municipio -------------------------------------------
 
+cat("Computing daily vax counts for municipios: ")
+
 ## Fully vaxed
+cat("fully vaxed, ")
+
 daily_counts_vax_age_gender_manu_muni <- dat_vax[!is.na(vax_date), .(full = .N),
                                             keyby = .(vax_date, vax_ageRange, gender, manu_1, municipio)]
 names(daily_counts_vax_age_gender_manu_muni) <- c("date", "ageRange", "gender", "manu", "municipio", "full")
@@ -145,6 +175,8 @@ counts_vax_age_gender_manu_muni[, full := cumsum(full), keyby = .(ageRange, gend
 setnames(counts_vax_age_gender_manu_muni, "full", "n")
 
 ## One dose
+cat("one dose, ")
+
 daily_counts_onedose_age_gender_manu_muni <- dat_vax[!is.na(date_1), .(onedose = .N),
                                                 keyby = .(date_1, ageRange_1, gender, manu_1, municipio)]
 names(daily_counts_onedose_age_gender_manu_muni) <- c("date", "ageRange", "gender", "manu", "municipio", "onedose")
@@ -157,6 +189,7 @@ counts_onedose_age_gender_manu_muni[, onedose := cumsum(onedose), keyby = .(ageR
 setnames(counts_onedose_age_gender_manu_muni, "onedose", "n")
 
 ## Partially vaxed
+cat("partial, ")
 counts_partial_age_gender_manu_muni<- merge(counts_vax_age_gender_manu_muni,
                                        counts_onedose_age_gender_manu_muni,
                                        all = TRUE, by = c("date", "ageRange", "gender", "manu", "municipio"))
@@ -164,6 +197,8 @@ counts_partial_age_gender_manu_muni[ , n := n.y - n.x]
 counts_partial_age_gender_manu_muni <- counts_partial_age_gender_manu_muni[, !c("n.y", "n.x")]
 
 ## Boosters
+cat("boosters, ")
+
 daily_counts_booster_age_gender_manu_muni <- dat_vax[!is.na(booster_date), .(booster = .N),
                                                 keyby = .(booster_date, booster_ageRange, gender, booster_manu, municipio)]
 names(daily_counts_booster_age_gender_manu_muni) <- c("date", "ageRange", "gender", "manu", "municipio", "booster")
@@ -174,6 +209,7 @@ counts_booster_age_gender_manu_muni[, booster := cumsum(booster), keyby = .(ageR
 setnames(counts_booster_age_gender_manu_muni, "booster", "n")
 
 ## Lost immunnity
+cat("lost immuninty.\n")
 daily_counts_lost_age_gender_manu_muni <- dat_vax[!is.na(last_immune_date), .(lost = .N),
                                              keyby = .(last_immune_date, vax_ageRange, gender, manu_1, municipio)]
 names(daily_counts_lost_age_gender_manu_muni) <- c("date", "ageRange", "gender", "manu", "municipio", "lost")
@@ -201,7 +237,7 @@ daily_vax_counts_by_municipio$municipio <-
   factor(daily_vax_counts_by_municipio$municipio, levels = muni_levels)
 
 # Creating table with population sizes of each vax status
-
+message("Computing per day totals.")
 unvax <- counts_onedose_age_gender_manu[ , .(total = sum(n)), 
                                          keyby = .(date, ageRange, gender)]
 unvax <- merge(unvax, pop_by_age_gender, all.x = TRUE, 
@@ -246,6 +282,8 @@ poblacion_muni$ageRange <- factor(poblacion_muni$ageRange, levels = age_levels)
 poblacion_muni$municipio <- 
   factor(poblacion_muni$municipio, levels = muni_levels)
 poblacion_muni[gender=="O" & status == "UNV", n := 0]
+
+message("Computing piramdes.")
 
 ### PIRAMIDE
 tab <- poblacion %>% 
@@ -306,6 +344,8 @@ piramide_tab <- bind_rows(piramide_tab, piramide_tab_muni)
  
 ## Proveedores
 
+message("Wrangling proveedores.")
+
 cols1 <-  grep("_1", names(dat_vax), value=TRUE)
 cols2 <- grep("_2", names(dat_vax), value=TRUE)
 cols3 <- grep("_3", names(dat_vax), value=TRUE)
@@ -336,6 +376,8 @@ proveedores <- proveedores[!is.na(proveedor) & !(dose=="Segunda" & manu == "JSN"
                            by=.(proveedor, date, dose, manu, ageRange),
                            .SDcols = c("diff", "index")]
 
+
+
 rm(daily_counts_booster_age_gender_manu,
    daily_counts_lost_age_gender_manu,
    daily_counts_vax_age_gender_manu,
@@ -349,10 +391,21 @@ rm(daily_counts_booster_age_gender_manu,
    counts_partial_age_gender_manu_muni, 
    counts_vax_age_gender_manu_muni,
    piramide_tab_muni,
-   tab, tab_muni, unvax)
+   tab, tab_muni, unvax,
+   all_combs, all_combs_muni)
+gc();gc()
+## save files
 
+save(proveedores, file=file.path(rda_path ,"proveedores.rda"))
+poblacion <- collapse_age_no_copy(poblacion, vars = "n")
+poblacion_muni <- collapse_age_no_copy(poblacion_muni, vars = "n")
+save(poblacion, poblacion_muni, file = file.path(rda_path ,"poblacion.rda"))
+
+rm(proveedores, poblacion, poblacion_muni); gc(); gc()
 
 # Cases -------------------------------------------------------------------
+
+message("Wrangling cases.")
 
 ## remove correctional cases to avoid bias introduced by outbreak
 dat_vax <- dat_vax[(is.na(proveedor_1) | proveedor_1!="Correccional") &
@@ -388,6 +441,8 @@ pop_susceptible[, cases:=NULL]
 
 
 ### Compute number with and without booster for each day after vaccinated
+message("Computing populations for vax date/date combinations.")
+
 compute_date_comb_counts <- function(tab, other_date = "booster_date"){
   the_date <- unique(tab$date)
   all_dates <- data.table(tmp = seq(the_date, last_day, "days"))
@@ -416,6 +471,8 @@ pop_vax$ageRange <- factor(pop_vax$ageRange, levels = age_levels)
 pop_vax <- pop_vax[order(manu, ageRange, gender, date, vax_date)]
 #pop_vax %>% group_by(date,ageRange, manu) %>% summarize(n=sum(poblacion)) %>% ggplot(aes(date,n,color=manu))+geom_line()+facet_wrap(~ageRange)
 
+
+message("Computing populations for vax date/date combinations for partial vax.")
 
 ## population of partially vaccinated
 dat_vax[, date := date_1] ##make date date_1 for compute_date_comb_counts
@@ -469,6 +526,8 @@ pop_unvax <- pop_unvax[,c("date", "ageRange","gender", "poblacion")]
 # Booster counts ----------------------------------------------------------
 
 ### Booster counts - a bit different because we dont have to remove boosters... it's monotically increasing
+message("Computing populations for vax date/date combinations for boosters.")
+
 daily_counts_booster_age_gender_manu <- dat_vax[!is.na(booster_date), .(poblacion = .N),
                                                 keyby = .(booster_date, booster_ageRange, gender, manu_1, booster_manu)]
 names(daily_counts_booster_age_gender_manu) <- c("booster_date", "booster_ageRange", "gender", "manu_1", "booster_manu", "poblacion")
@@ -497,6 +556,10 @@ vax <- melt(vax, measure.vars = c("cases", "hosp", "death"),
             variable.name = "outcome", value.name = "obs")
 vax[,`:=`(primary_manu=NA, status = "VAX")]
 
+rm(pop_vax); gc(); gc()
+
+message("Computing daily counts.")
+
 par <- dat_cases_vax[status == "PAR"  & gender %in% c("F", "M") & ageRange != "0-4" & date <= last_day]
 setnames(par, "date_1", "vax_date")
 par <- par[, .(cases = .N, hosp = sum(hosp), death = sum(death)), keyby = .(manu, ageRange, gender, date, vax_date)]
@@ -504,6 +567,8 @@ par <- merge(pop_par, par, by = c("manu", "ageRange", "gender", "date", "vax_dat
 par[is.na(par)] <- 0
 par <- melt(par, measure.vars = c("cases", "hosp", "death"), variable.name = "outcome", value.name = "obs")
 par[,`:=`(primary_manu=NA, status = "PAR")]
+
+rm(pop_par); gc(); gc()
 
 bst <- dat_cases_vax[status == "BST" & gender %in% c("F", "M") & booster_ageRange != "0-4"]
 bst <- bst[, .(cases = .N, hosp = sum(hosp), death = sum(death)), keyby = .(manu_1, booster_manu, booster_ageRange, gender, date, booster_date)]
@@ -518,6 +583,8 @@ setnames(bst, c("manu_1","booster_manu", "booster_date", "booster_ageRange"),
 bst <- melt(bst, measure.vars = c("cases", "hosp", "death"), variable.name = "outcome", value.name = "obs")
 bst[, status := "BST"]
 
+rm(all_bst_combs); gc(); gc()
+
 unvax <- dat_cases_vax[status == "UNV" & gender %in% c("F", "M")]
 unvax <- unvax[, .(cases = .N, hosp = sum(hosp), death = sum(death)), keyby = .(date, ageRange, gender)]
 unvax <- merge(pop_unvax, unvax, by = c("date", "ageRange", "gender"), all.x = TRUE) 
@@ -525,6 +592,8 @@ unvax[is.na(unvax)] <- 0
 unvax <- melt(unvax, measure.vars = c("cases", "hosp", "death"), variable.name = "outcome", value.name = "obs")
 
 unvax[,`:=`(primary_manu=NA, manu="UNV", vax_date=make_date(NA), status = "UNV")]
+
+rm(pop_unvax); gc();gc()
 
 ## store counts for each vax date and case date combination
 counts <- rbindlist(list(par, vax, bst, unvax), use.names = TRUE)
@@ -716,36 +785,27 @@ outcome_tab <- left_join(outcome_tab_totals, outcome_tab_rates,
 
 #outcome_tab <- left_join(outcome_tab, totals, by = c("manu", "status"))
 
-collapse_age_no_copy <- function(tab, vars){
-  cols <- setdiff(names(tab), vars)
-  tab[, ageRange := forcats::fct_collapse(ageRange, 
-                                          "18-29" = c("18-24", "25-29"),
-                                          "30-39" = c("30-34", "35-39"),
-                                          "40-59" = c("40-44", "45-49"),
-                                          "50-59" = c("50-54", "55-59"),
-                                          "60-69" = c("60-64", "65-69"),
-                                          "70-79" = c("70-74", "75-79"),
-                                          "80+" = c("80-84", "85+"))]
-  ret <- tab[, lapply(.SD, sum), keyby = cols, .SDcols=vars]
-  return(ret)
-}
+message("Saving data.")
 
 ### collapse ageRanges
-save(proveedores, file=file.path(rda_path ,"proveedores.rda"))
 save(daily_counts, file=file.path(rda_path ,"daily_counts.rda"))
+
 save(counts, file=file.path(rda_path ,"counts.rda"))
+
 save(summary_tab, outcome_tab, outcome_tab_details, file=file.path(rda_path ,"tabs.rda"))
-poblacion <- collapse_age_no_copy(poblacion, vars = "n")
-poblacion_muni <- collapse_age_no_copy(poblacion_muni, vars = "n")
-save(poblacion, poblacion_muni, file = file.path(rda_path ,"poblacion.rda"))
+
 daily_vax_counts <- collapse_age_no_copy(daily_vax_counts, vars = c("onedose", "full", "booster","lost"))
 pop_by_age_gender<-collapse_age_no_copy(pop_by_age_gender, "poblacion")
 save(daily_vax_counts, pop_by_age_gender, file = file.path(rda_path, "daily_vax_counts.rda"))
+
 daily_vax_counts_by_municipio <- collapse_age_no_copy(daily_vax_counts_by_municipio, vars = c("onedose", "full", "booster","lost"))
 pop_by_age_gender_municipio <-collapse_age_no_copy(pop_by_age_gender_municipio, "poblacion")
 save(pop_by_age_gender_municipio, daily_vax_counts_by_municipio, file = file.path(rda_path, "daily_vax_counts_by_municipio.rda"))
-immune <- collapse_age(immune, vars = "n")
-save(immune, file = file.path(rda_path ,"immune.rda"))
+
 save(piramide, piramide_tab, file = file.path(rda_path, "piramide.rda"))
-dashboard_age_levels <- levels(poblacion$ageRange)
+
+immune <- collapse_age_no_copy(immune, vars = "n")
+save(immune, file = file.path(rda_path ,"immune.rda"))
+
+dashboard_age_levels <- levels(daily_vax_counts$ageRange)
 save(list = c(dates_rda_variables, "collapsed_age_levels", "dashboard_age_levels"), file = file.path(rda_path, "dashboard-dates.rda"))
