@@ -326,9 +326,9 @@ server <- function(input, output, session) {
       mutate(date = if_else(is.na(date) & !is.na(date_death), date_death, date)) %>%
       filter(date>= first_day & date <= last_day) %>%
       mutate(status = case_when(
-        date > booster_date ~"BST",
-        date > vax_date ~ "VAX",
-        date > date_1 ~"PAR",
+        date >= booster_date ~"BST",
+        date >= vax_date ~ "VAX",
+        date >= date_1 ~"PAR",
         TRUE ~ "UNV")) %>%
       mutate(manu = factor(ifelse(status == "UNV", "UNV", as.character(manu_1)), levels= c("UNV", "MOD", "PFR", "JSN"))) 
     
@@ -358,12 +358,19 @@ server <- function(input, output, session) {
       mutate(booster = case_when(status == "BST" ~ as.character(booster_manu),
                                  status == "VAX" ~ "",
                                  TRUE ~ "")) %>%
-      select(date, ageRange, gender, status, manu, days, booster, booster_days) %>%
+      mutate(vax_al_dia = case_when(status %in% c("UNV","PAR") ~ "",
+                                    status == "BST" | 
+                                      (status=="VAX" & manu %in% c("PFR","MOD") & days <= 150) | 
+                                      (status=="VAX" & manu == "JSN" & days <= 60) ~ " (al día)",
+                                    TRUE ~ " (expirada)")) %>%
+      select(date, ageRange, gender, status, manu, days, booster, booster_days, vax_al_dia) %>%
       mutate(status = as.character(recode(status, UNV = "No vacunado", PAR= "Parcial", VAX="Vacunado", BST = "Vacunado"))) %>%
       mutate(status = ifelse(gender == "F" & status == "Vacunado", "Vacunada", status)) %>%
       mutate(status = ifelse(gender == "F" & status == "No vacunado", "No vacunada", status)) %>%
+      mutate(status = paste0(status, vax_al_dia)) %>%
+      select(-vax_al_dia) %>%
       mutate(manu = recode(as.character(manu), UNV = "", MOD = "Moderna", PFR = "Pfizer", JSN = "J & J")) %>%
-      mutate(booster = recode(as.character(booster), MOD = "Moderna", PFR = "Pfizer", JSN = "J & J"))
+      mutate(booster = recode(as.character(booster), MOD = "Moderna", PFR = "Pfizer", JSN = "J & J")) 
      
     make_datatable(ret, 
                    col.names = c("Fecha", "Grupo de edad", "Sexo", "Vacunación", 
