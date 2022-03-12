@@ -636,7 +636,7 @@ server <- function(input, output, session) {
         ungroup()
     }
     
-    if (input$graficas_agerange =="12-17") {
+    if (input$graficas_agerange == "12-17") {
     daily_vax_counts <- daily_vax_counts %>%
       filter(date >=  ifelse(input$graficas_range[1]< make_date(2021,05,12), make_date(2021,05,12), input$graficas_range[1])  & date <= input$graficas_range[2]) 
     } else if (input$graficas_agerange =="5-11"){

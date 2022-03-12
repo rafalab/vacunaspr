@@ -288,7 +288,7 @@ message("Computing piramdes.")
 ### PIRAMIDE
 tab <- poblacion %>% 
   filter(date == max(date) & gender %in% c("M","F")) %>%
-  collapse_age(vars="n") %>%
+  #collapse_age(vars="n") %>%
   group_by(ageRange, gender, status) %>%
   summarize(n = sum(n), .groups = "drop") %>%
   mutate(n = pmax(0, n)) %>%
@@ -301,7 +301,7 @@ tab <- poblacion %>%
 tab_muni <- poblacion_muni %>% 
   filter(municipio!="No reportado") %>%
   filter(date == max(date) & gender %in% c("M","F")) %>%
-  collapse_age(vars="n") %>%
+  #collapse_age(vars="n") %>%
   group_by(municipio, ageRange, gender, status) %>%
   summarize(n = sum(n), .groups = "drop") %>%
   mutate(n = pmax(0, n)) %>%
@@ -673,7 +673,7 @@ tasas_ped <- daily_vax_counts %>%
 
 
 tasas_ped_2 <- daily_vax_counts %>% 
-  filter(date %in% span_range & ageRange=="12-17") %>%
+  filter(date %in% span_range & ageRange=="12-15") %>%
   summarize(onedose = sum(onedose)/length(span_range) * 7, 
             full= sum(full)/length(span_range) * 7, 
             immune = (sum(full) - sum(lost))/length(span_range)*7,
@@ -687,8 +687,8 @@ summary_tab <- data.frame(names = c("Vacunas administradas",
                                     "Personas con serie primaria completa",
                                     "Personas con boosters",
                                     "Personas con serie primaria completa con necesidad de booster (vacunación expirada)",
-                                    "Menores (12-17 años) con booster",
-                                    "Menores (12-17 años) con necesidad de booster (vacunación expirada)",
+                                    "Menores (12-15 años) con booster",
+                                    "Menores (12-15 años) con necesidad de booster (vacunación expirada)",
                                     "Menores (5-11 años) con por lo menos 1 dosis",
                                     "Menores (5-11 años) con serie primaria completa"),
                   total = c(administradas, the_immune, primera, completa, booster, lost, booster_ped, lost_ped, pediatric_primera, pediatric_completa),
@@ -702,13 +702,14 @@ collapsed_age_levels <- c("0-4", "5-11", "12-17", "18-44", "45-64", "65+")
                                 
 daily_counts <- copy(counts)
 daily_counts$ageRange <- fct_collapse(daily_counts$ageRange, 
+                                      "12-17" = c("12-15", "16-17"),
                                       "18-44" = c("18-24", "25-29", "30-34", "35-39", "40-44"),
                                       "45-64" = c("45-49", "50-54", "55-59","60-64"),
                                       "65+" = c("65-69", "70-74", "75-79","80-84", "85+"))
 
 
 daily_counts <- daily_counts[!(ageRange == "0-4" |
-                                 (ageRange %in% c("5-11", "12-17") & manu%in%c("MOD", "JSN")) |
+                                 (ageRange %in% c("5-11", "12-15", "16-17") & manu%in%c("MOD", "JSN")) |
                                  (ageRange == "5-11" & status != "UNV" & vax_date<first_ped_day) |
                                  (status == "BST" & manu == "JSN"))]
 
