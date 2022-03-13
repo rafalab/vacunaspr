@@ -686,9 +686,9 @@ summary_tab <- data.frame(names = c("Vacunas administradas",
                                     "Personas con por lo menos 1 dosis",
                                     "Personas con serie primaria completa",
                                     "Personas con boosters",
-                                    "Personas con serie primaria completa con necesidad de booster (vacunación expirada)",
+                                    "Personas con serie primaria completa con necesidad de booster (vacunación no al día)",
                                     "Menores (12-15 años) con booster",
-                                    "Menores (12-15 años) con necesidad de booster (vacunación expirada)",
+                                    "Menores (12-15 años) con necesidad de booster (vacunación no al día)",
                                     "Menores (5-11 años) con por lo menos 1 dosis",
                                     "Menores (5-11 años) con serie primaria completa"),
                   total = c(administradas, the_immune, primera, completa, booster, lost, booster_ped, lost_ped, pediatric_primera, pediatric_completa),
@@ -719,8 +719,8 @@ daily_counts[, status := fcase(
   status == "PAR", "Vacunación parcial",
   status == "UNV", "No vacunados",
   (status == "VAX" & ((manu!="JSN" & day < 150) | (manu=="JSN" & day < 60))) | status=="BST", "Vacunación al día",  
-  default = "Vacunación expirada")]
-daily_counts$status <- factor(daily_counts$status, levels=c("No vacunados", "Vacunación parcial", "Vacunación expirada", "Vacunación al día"))
+  default = "Vacunación no al día")]
+daily_counts$status <- factor(daily_counts$status, levels=c("No vacunados", "Vacunación parcial", "Vacunación no al día", "Vacunación al día"))
  
 daily_counts <- daily_counts[, keyby = .(date, ageRange, gender, outcome, status, manu), 
             lapply(.SD, sum), 
