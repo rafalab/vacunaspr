@@ -38,7 +38,7 @@ pop_by_age_gender  <-
   as.data.table() 
 
 pr_pop <- sum(pop_by_age_gender$poblacion)
-pr_adult_pop <- sum(pop_by_age_gender[!ageRange %in% c("0-4", "5-11", "12-17")]$poblacion)
+pr_adult_pop <- sum(pop_by_age_gender[!ageRange %in% c("0-4", "5-11", "12-15", "16-17")]$poblacion)
 
 
 pop_by_age_gender_municipio <- 
@@ -53,8 +53,9 @@ pop_by_age_gender_municipio <-
          `1017` = `1013` + `1417`,
          `85Inf` = `85PLUS`) %>%
   mutate(`0511` = 0.5* `0509` * 7/5 + 0.5 * `0513`*7/9,
-         `1217` = `1017` * 6/8) %>%
-  select(NAME, gender, "0004", "0511", "1217", "1824", "2529", "3034", "3539", "4044",
+         `1215` = `1017` * 4/8, 
+         `1617` = `1017` * 2/8) %>%
+  select(NAME, gender, "0004", "0511", "1215", "1617", "1824", "2529", "3034", "3539", "4044",
          "4549", "5054", "5559", "6064", "6569", "7074", "7579", "8084", "85Inf") %>%
   rename(municipio =  NAME) %>% 
   mutate(municipio = str_remove(municipio, " Municipio")) %>%

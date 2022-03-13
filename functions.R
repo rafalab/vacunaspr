@@ -34,6 +34,8 @@ make_datatable <- function(tab, col.names = colnames(tab),
                            align = rep("c", ncol(tab)),
                            nowrap = 1){
   
+  if(nrow(tab)<1) return(NULL)
+  
   tab <- tab %>% 
     mutate(dummy = date, date = format(date, "%B %d")) %>%
     arrange(desc(dummy)) %>%

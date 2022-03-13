@@ -288,7 +288,7 @@ server <- function(input, output, session) {
        ungroup() %>%
        filter(date >= input$event_range[1] & date <= input$event_range[2]) %>%
        filter(denom > 1000) %>%
-       mutate(Vacunación = ifelse(status=="Vacunación expirada", "expirada", "al día"))
+       mutate(Vacunación = ifelse(status=="Vacunación no al día", "no al día", "al día"))
      
        p <- tmp %>% ggplot(aes(date, rate, color = manu, lty = Vacunación)) +
          geom_line(lwd = 1.25, alpha = 0.7) +
@@ -335,6 +335,7 @@ server <- function(input, output, session) {
     dat_cases_vax$status <- factor(dat_cases_vax$status, levels = c("UNV", "PAR", "VAX", "BST"))
     
     dat_cases_vax$ageRange_2 <- fct_collapse(dat_cases_vax$ageRange, 
+                                          "12-17" = c("12-15", "16-17"),
                                          "18-44" = c("18-24", "25-29", "30-34", "35-39", "40-44"),
                                          "45-64" = c("45-49", "50-54", "55-59","60-64"),
                                          "65+" = c("65-69", "70-74", "75-79","80-84", "85+"))
@@ -350,7 +351,6 @@ server <- function(input, output, session) {
       filter(!!sym(input$event_type)) %>%
       mutate(date = !!sym(date_name)) %>%
       filter(date >= input$event_range[1] & date <= input$event_range[2]) %>%
-      slice(1:1000) %>%
       mutate(days = pmax(0, as.numeric(date_cases-vax_date))) %>%
       mutate(days = na_if(days, 0)) %>%
       mutate(booster_days = pmax(0, as.numeric(date_cases-booster_date))) %>%
@@ -362,23 +362,30 @@ server <- function(input, output, session) {
                                     status == "BST" | 
                                       (status=="VAX" & manu %in% c("PFR","MOD") & days <= 150) | 
                                       (status=="VAX" & manu == "JSN" & days <= 60) ~ " (al día)",
-                                    TRUE ~ " (expirada)")) %>%
+                                    TRUE ~ " (no al día)")) %>%
       select(date, ageRange, gender, status, manu, days, booster, booster_days, vax_al_dia) %>%
       mutate(status = as.character(recode(status, UNV = "No vacunado", PAR= "Parcial", VAX="Vacunado", BST = "Vacunado"))) %>%
-      mutate(status = ifelse(gender == "F" & status == "Vacunado", "Vacunada", status)) %>%
-      mutate(status = ifelse(gender == "F" & status == "No vacunado", "No vacunada", status)) %>%
+      mutate(gender = replace_na(gender, "O")) %>%
+      mutate(status = case_when(gender == "F" & status == "Vacunado" ~ "Vacunada",
+                                gender == "F" & status == "No vacunado" ~ "No vacunada", 
+                                gender == "O" & status == "Vacunado" ~ "Vacunado/a",
+                                gender == "O" & status == "No vacunado" ~ "No vacunado/a", 
+                                gender == "M" & status == "Vacunado" ~ "Vacunado",
+                                gender == "M" & status == "No vacunado" ~ "No vacunado")) %>% 
       mutate(status = paste0(status, vax_al_dia)) %>%
       select(-vax_al_dia) %>%
       mutate(manu = recode(as.character(manu), UNV = "", MOD = "Moderna", PFR = "Pfizer", JSN = "J & J")) %>%
       mutate(booster = recode(as.character(booster), MOD = "Moderna", PFR = "Pfizer", JSN = "J & J")) 
-     
+    
+      if(nrow(ret)>1000) ret <- slice(ret, 1:1000)
+    
     make_datatable(ret, 
                    col.names = c("Fecha", "Grupo de edad", "Sexo", "Vacunación", 
                                  "Tipo de vacuna", "Días desde completar dosis", 
                                  "Booster", "Días desde el booster"),
                    align = c("r", "c", "c", "c", "c", "r", "r","r"),
                    nowrap = 1:3)
-    },
+  },
   server = FALSE)
   
   output$piramide <- renderPlot({
@@ -636,7 +643,7 @@ server <- function(input, output, session) {
         ungroup()
     }
     
-    if (input$graficas_agerange =="12-17") {
+    if (input$graficas_agerange == "12-17") {
     daily_vax_counts <- daily_vax_counts %>%
       filter(date >=  ifelse(input$graficas_range[1]< make_date(2021,05,12), make_date(2021,05,12), input$graficas_range[1])  & date <= input$graficas_range[2]) 
     } else if (input$graficas_agerange =="5-11"){
@@ -712,7 +719,7 @@ y han transcurrido 14 días desde su última dosis.
 <br/> 
 </li><li> Personas con boosters: suma de personas que completaron sus dosis de vacunación y se administraron su dosis de refuerzo. 
 <br/> 
-</li><li> Personas con serie primaria completa con necesidad de booster (<i>vacunación expirada </i>): suma de personas 
+</li><li> Personas con serie primaria completa con necesidad de booster (<i>vacunación no al día </i>): suma de personas 
 que ya completaron sus dosis de vacunación pero han transcurrido 5 meses (Pfizer o Moderna) o 2 meses (Janssen) y no se han puesto su dosis de refuerzo. 
 <br/> 
 </li><li> Vacunación <i>parcial</i> se refiere a aquellas personas que han iniciado su serie de vacunación pero aún no se consideran como vacunados por no haber transcurrido 14 días luego de su última dosis requerida. 
