@@ -631,7 +631,7 @@ ped_pop <- pop_by_age_gender %>%
   sum()
 
 ped2_pop <- pop_by_age_gender %>% 
-  filter(ageRange=="12-17") %>% 
+  filter(ageRange=="12-15") %>% 
   pull(poblacion) %>% 
   sum()
 
@@ -647,12 +647,12 @@ lost_prop <-lost/pr_pop
 
 four_dose <- sum(!is.na(dat_vax$extra_dose))
 
-booster_ped <- daily_vax_counts %>% filter(ageRange=="12-17" & date >= make_date(2022,01,06)) %>%
+booster_ped <- daily_vax_counts %>% filter(ageRange=="12-15" & date >= make_date(2022,01,06)) %>%
   pull(booster) %>% sum(na.rm=TRUE)
 
 booster_ped_prop <- booster_ped/ ped2_pop
 
-lost_ped <- daily_vax_counts %>% filter(ageRange=="12-17" & date >= make_date(2022,01,06)) %>%
+lost_ped <- daily_vax_counts %>% filter(ageRange=="12-15" & date >= make_date(2022,01,06)) %>%
   pull(lost) %>% sum(na.rm=TRUE)
 
 lost_ped_prop <- lost_ped/ ped2_pop
