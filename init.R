@@ -6,7 +6,7 @@ source("functions.R")
 
 
 ## if on the server get the latest data
-if(Sys.info()["nodename"] == "fermat.dfci.harvard.edu"){
+if(grepl("fermat", Sys.info()["nodename"])){
   rda_path <- "/homes10/rafa/dashboard/vacunaspr/rdas"
 } else{
   rda_path <- "rdas"
