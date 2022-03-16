@@ -2,6 +2,7 @@
 library(kableExtra)
 library(tidyverse)
 library(lubridate)
+library(mapproj)
 source("functions.R")
 
 
