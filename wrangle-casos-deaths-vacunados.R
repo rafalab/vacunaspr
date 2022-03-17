@@ -1,7 +1,7 @@
 source("~/R/vacunaspr/init.R")
 library(data.table)
 
-age_starts <- c(0, 5, 12, 18, seq(25, 85, 5))
+age_starts <- c(0, 5, 12, 16, 18, seq(25, 85, 5))
 age_ends <- c(age_starts[-1]-1, Inf)
 age_levels <- paste(age_starts, age_ends, sep = "-")
 age_levels[length(age_levels)] <- paste0(age_starts[length(age_levels)],"+")
@@ -9,7 +9,7 @@ manu_levels <- c("UNV", "MOD", "PFR", "JSN")
 first_ped_day <- make_date(2021, 11, 04)
 first_booster_day <- make_date(2021, 8, 13) 
 first_jnj_booster_day <- make_date(2021, 10, 22)
-first_day_cases <- make_date(2020,09,15)
+first_day_cases <- make_date(2020,12,15) - days(180)
 gender_levels <- c( "F", "M", "O", "U")
 
 # useful function
