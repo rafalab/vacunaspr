@@ -3,6 +3,7 @@ library(kableExtra)
 library(tidyverse)
 library(lubridate)
 library(mapproj)
+library(markdown)
 source("functions.R")
 
 
