@@ -4,8 +4,7 @@ library(stringdist)
 library(data.table)
 
 gender_levels <- c("F", "M", "O", "U")
-#age_starts <- c(0, 5, 12, 18, seq(30, 80, 10))
-age_starts <- c(0, 5, 12, 18, seq(25, 85, 5))
+age_starts <- c(0, 5, 12, 16, 18, seq(25, 85, 5))
 age_ends <- c(age_starts[-1]-1, Inf)
 age_levels <- paste(age_starts, age_ends, sep = "-")
 age_levels[length(age_levels)] <- paste0(age_starts[length(age_levels)],"+")
@@ -15,14 +14,16 @@ first_booster_day <- make_date(2021, 8, 13)
 first_jnj_booster_day <- make_date(2021, 10, 22) 
 
 ####
-the_preis_map_stamp = last_day
+
+load("~/R/vacunaspr/private_rdas/preis_map.rda")
+
 
 convert_date <- function(d) as_date(ymd_hms(d, tz = "America/Puerto_Rico"))
 
 # Read in vaccine records -------------------------------------------------
 # this file is not publicly shared so this wont run
 
-load("~/R/vacunaspr/rdas/vax_data_BP.rda")
+load("~/R/vacunaspr/private_rdas/vax_data_BP.rda")
 
 # RAFAs date correction 
 download_date <- as_date(max(vax_data_BP$INSERT_STAMP)) + days(1)
@@ -88,7 +89,6 @@ preis <- preis[, c("id", "gender", "ageRange","municipio",
                    "estado", "date", "manu", "insert_date", "proveedor")]
   
 
-load("~/R/vacunaspr/rdas/preis_map.rda")
 preis<-preis[date<=the_preis_map_stamp,]
 
 
@@ -257,12 +257,12 @@ dat_vax[manu_1 == "JSN" &
 
 ## define the vax date and booster date
 dat_vax[manu_1 != "JSN", 
-        c("vax_date", "booster_date", "booster_manu", "booster_insert_date", "booster_proveedor", "booster_ageRange") := 
-          .(date_2, date_3, manu_3, insert_date_3, proveedor_3, ageRange_3)]
+        c("vax_date", "vax_ageRange", "booster_date", "booster_manu", "booster_insert_date", "booster_proveedor", "booster_ageRange") := 
+          .(date_2, ageRange_2, date_3, manu_3, insert_date_3, proveedor_3, ageRange_3)]
 
 dat_vax[manu_1 == "JSN", 
-        c("vax_date", "booster_date", "ageRange_2", "manu_2", "booster_manu", "booster_insert_date", "booster_proveedor", "booster_ageRange") := 
-          .(date_1, date_2, ageRange_1, manu_1, manu_2, date_2, proveedor_2, ageRange_2)]
+        c("vax_date", "vax_ageRange", "booster_date", "ageRange_2", "manu_2", "booster_manu", "booster_insert_date", "booster_proveedor", "booster_ageRange") := 
+          .(date_1, ageRange_1, date_2, ageRange_1, manu_1, manu_2, date_2, proveedor_2, ageRange_2)]
 
 dat_vax[!is.na(vax_date), vax_date := vax_date + days(14)]
 dat_vax[!is.na(booster_date), booster_date := booster_date + days(14)]
@@ -280,7 +280,7 @@ colnames(dat_vax)
 class(dat_vax)
 
 ## RDS for dat_casos_vacunados
-saveRDS(dat_vax, file="~/R/vacunaspr/rdas/dat_vax.rds")
+save(dat_vax, file="~/R/vacunaspr/private_rdas/dat_vax_id.rda")
 
 dat_vax <- dat_vax %>% 
   select(-id)  

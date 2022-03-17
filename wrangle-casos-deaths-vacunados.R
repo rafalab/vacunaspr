@@ -21,7 +21,7 @@ recode_manu <- function(x)  recode(x, 'Johnson & Johnson' = 'JSN',
                                          Astrazeneca = "AZN")
 ### load case data
 
-dat_cases <-  readRDS("~/R/vacunaspr/rdas/casos.RDS") %>%
+cases_BP <-  readRDS("~/R/vacunaspr/private_rdas/casos.RDS") %>%
   mutate(lastHospitalizedDate = na_if(lastHospitalizedDate, "0001-01-01T00:00:00Z")) %>%
   mutate(across(contains("Dat"), convert_date)) %>%
   filter(caseType %in% c("Confirmed", "Probable") &
@@ -46,9 +46,9 @@ dat_cases <-  readRDS("~/R/vacunaspr/rdas/casos.RDS") %>%
 
 ## include death data 
 
-deaths_BP <- readRDS("~/R/vacunaspr/rdas/deaths_BP.RDS") %>%
+deaths_BP <- readRDS("~/R/vacunaspr/private_rdas/deaths_BP.RDS") %>%
   setNames(c("patientId", "birthDate", "gender", "physicalCity", "personDiedCovid", "date_death")) %>%
-  filter(!(patientId %in% dat_cases$patientId)) %>%
+  filter(!(patientId %in% cases_BP$patientId)) %>%
   mutate(across(contains("date"), convert_date)) %>%
   mutate(gender = case_when(str_starts(gender, "F|F") ~ "F",
                             str_starts(gender, "M|m") ~ "M", 
@@ -63,21 +63,23 @@ deaths_BP <- readRDS("~/R/vacunaspr/rdas/deaths_BP.RDS") %>%
   
 ### merge death data with case data
 
-dat_cases <- rbindlist(list(deaths_BP, dat_cases), fill=T) %>% distinct(patientId, .keep_all = T)
+deaths_cases_BP <- rbindlist(list(deaths_BP, cases_BP), fill=T) %>% distinct(patientId, .keep_all = T)
 
 ### FOR NOW USE MY OWN MATCH
-load("~/R/vacunaspr/rdas/bp_preis_maps.rda")
-dat_vax <- readRDS("rdas/dat_vax.rds")
+load("~/R/vacunaspr/private_rdas/bp_preis_maps.rda")
+load("~/R/vacunaspr/private_rdas/dat_vax_id.rda")
 bp_preis_map <- final_map %>% select(id.x, id.y, score) %>%
   setNames(c("patientId", "PATIENT_ID", "score"))
 
-dat_cases <- dat_cases %>%  
+dat_cases <- deaths_cases_BP %>%  
   left_join(bp_preis_map, by = "patientId") %>%
   left_join(dat_vax, by = c("PATIENT_ID" = "id")) %>%
-  filter(!(is.na(date) & is.na(date_death)))
+  filter(!(is.na(date) & is.na(date_death))) %>%
+  mutate(gender.x = case_when(!is.na(gender.y) ~ gender.y,
+                              TRUE ~ gender.x)) 
 
 dat_cases_vax <- dat_cases %>% 
-  select(date, ageRange, gender.x, date_hosp, 
+  select(date, ageRange, ageRange_1, vax_ageRange, booster_ageRange, gender.x, date_hosp, 
           date_death, municipio, estado, date_1, manu_1, proveedor_1,
          date_2, manu_2, proveedor_2, date_3, manu_3, proveedor_3, 
          date_4, manu_4, proveedor_4, extra_dose, vax_date, booster_date, booster_manu, 
@@ -99,40 +101,37 @@ save(dat_cases_vax,
      the_stamp_cases,
      file ="~/R/casos-vacunados-pr/boosters/rdas/dat_cases_vax.rda")
 
-dat_cases <- dat_cases_vax[!manu_1 %in% c("ATZ","OTR") & 
-                             !manu_2 %in% c("ATZ","OTR") &
-                             !manu_3 %in% c("ATZ","OTR") &
-                             (is.na(estado) | estado %in% c("PR", "No reportado")),]
-dat_cases <- dat_cases[(is.na(proveedor_1) | proveedor_1 != "Correccional") & 
-                         (is.na(proveedor_2) | proveedor_2 != "Correccional"),]
-dat_cases$manu_1 <- factor(dat_cases$manu_1, levels = manu_levels)
-dat_cases$manu_2 <- factor(dat_cases$manu_2, levels = manu_levels)
-dat_cases$manu_3 <- factor(dat_cases$manu_3, levels = manu_levels)
-
-dat_cases[manu_1 != "JSN", c("vax_date", "booster_date", "booster_manu") := .(date_2, date_3, manu_3)]
-dat_cases[manu_1 == "JSN", 
-          c("vax_date", "booster_date", "manu_2", "booster_manu") := .(date_1, date_2, manu_1, manu_2)] 
-dat_cases$manu <- factor(replace_na(as.character(dat_cases$manu_1), "UNV"), levels = manu_levels)
-
-dat_cases[!is.na(vax_date), vax_date := vax_date + days(14)]
-dat_cases[!is.na(booster_date), booster_date := booster_date + days(14)]
-
-dat_cases[!is.na(booster_date) & manu != "JSN" & (booster_date - days(14) < first_booster_day | booster_date - days(14) - date_1 < days(30)), 
-          c("booster_date", "booster_manu", "booster_insert_date", "booster_proveedor", "booster_ageRange") := .(NA, NA, NA, NA, NA)]
-dat_cases[!is.na(booster_date) & manu == "JSN" & (booster_date - days(14) < first_jnj_booster_day | booster_date - days(14) - date_1 < days(30)), 
-          c("booster_date", "booster_manu", "booster_insert_date", "booster_proveedor", "booster_ageRange") := .(NA, NA, NA, NA, NA)]
-# not vaxed, can't be boosted
-dat_cases[!is.na(booster_date) & is.na(vax_date), 
-          c("booster_date", "booster_manu", "booster_insert_date", "booster_proveedor", "booster_ageRange") := .(NA, NA, NA, NA, NA)]
-dat_cases[, status := "UNV"]
-dat_cases[date > date_1, status := "PAR"]
-dat_cases[date > vax_date, status := "VAX"]
-dat_cases[date > booster_date, status := "BST"]
-dat_cases[date <= date_1, manu := "UNV"]
-dat_cases$status <- factor(dat_cases$status, levels = c("UNV", "PAR", "VAX", "BST"))
-
-save(dat_cases, file="~/R/vacunaspr/rdas/dat_cases.rda")
-
-
-
+# dat_cases <- dat_cases_vax[!manu_1 %in% c("ATZ","OTR") & 
+#                              !manu_2 %in% c("ATZ","OTR") &
+#                              !manu_3 %in% c("ATZ","OTR") &
+#                              (is.na(estado) | estado %in% c("PR", "No reportado")),]
+# dat_cases <- dat_cases[(is.na(proveedor_1) | proveedor_1 != "Correccional") & 
+#                          (is.na(proveedor_2) | proveedor_2 != "Correccional"),]
+# dat_cases$manu_1 <- factor(dat_cases$manu_1, levels = manu_levels)
+# dat_cases$manu_2 <- factor(dat_cases$manu_2, levels = manu_levels)
+# dat_cases$manu_3 <- factor(dat_cases$manu_3, levels = manu_levels)
+# 
+# dat_cases[manu_1 != "JSN", c("vax_date", "booster_date", "booster_manu") := .(date_2, date_3, manu_3)]
+# dat_cases[manu_1 == "JSN", 
+#           c("vax_date", "booster_date", "manu_2", "booster_manu") := .(date_1, date_2, manu_1, manu_2)] 
+# dat_cases$manu <- factor(replace_na(as.character(dat_cases$manu_1), "UNV"), levels = manu_levels)
+# 
+# dat_cases[!is.na(vax_date), vax_date := vax_date + days(14)]
+# dat_cases[!is.na(booster_date), booster_date := booster_date + days(14)]
+# 
+# dat_cases[!is.na(booster_date) & manu != "JSN" & (booster_date - days(14) < first_booster_day | booster_date - days(14) - date_1 < days(30)), 
+#           c("booster_date", "booster_manu", "booster_insert_date", "booster_proveedor", "booster_ageRange") := .(NA, NA, NA, NA, NA)]
+# dat_cases[!is.na(booster_date) & manu == "JSN" & (booster_date - days(14) < first_jnj_booster_day | booster_date - days(14) - date_1 < days(30)), 
+#           c("booster_date", "booster_manu", "booster_insert_date", "booster_proveedor", "booster_ageRange") := .(NA, NA, NA, NA, NA)]
+# # not vaxed, can't be boosted
+# dat_cases[!is.na(booster_date) & is.na(vax_date), 
+#           c("booster_date", "booster_manu", "booster_insert_date", "booster_proveedor", "booster_ageRange") := .(NA, NA, NA, NA, NA)]
+# dat_cases[, status := "UNV"]
+# dat_cases[date > date_1, status := "PAR"]
+# dat_cases[date > vax_date, status := "VAX"]
+# dat_cases[date > booster_date, status := "BST"]
+# dat_cases[date <= date_1, manu := "UNV"]
+# dat_cases$status <- factor(dat_cases$status, levels = c("UNV", "PAR", "VAX", "BST"))
+# 
+# save(dat_cases, file="~/R/vacunaspr/rdas/dat_cases.rda")
 
