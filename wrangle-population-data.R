@@ -1,92 +1,127 @@
 library(tidyverse)
 library(lubridate)
 library(data.table)
-
-# pr_pop <- 3285874 ## population of puerto rico
-# pr_adult_pop <- 2724903
-# pr_child_pop <- pr_pop - pr_adult_pop
-
+library(tidycensus)
 
 if(Sys.info()["nodename"] == "fermat.dfci.harvard.edu"){
   rda_path <- "/homes10/rafa/dashboard/vacunaspr/rdas"
 } else{
   rda_path <- "rdas"
 }
-load(file.path(rda_path, "dates.rda"))
 
-age_starts <- as.numeric(str_extract(age_levels, "\\d+"))
-breaks <- sort(age_starts)
-labels <- c(paste(breaks[-length(breaks)], c(breaks[-1]-1), sep="-"),
-            paste0(breaks[length(breaks)], "+"))
-## downlaoded data like this: curl https://www2.census.gov/programs-surveys/popest/datasets/2010-2020/state/asrh/PRC-EST2020-SYASEX.csv >> PRC-EST2020-SYASEX.csv
-pop_by_age_gender  <-
-  read_csv("data/PRC-EST2020-SYASEX.csv") %>%
-  select(SEX, AGE, POPESTIMATE2020) %>%
-  setNames(c("gender", "ageRange", "poblacion")) %>%
-  filter(gender !=0 & ageRange != 999) %>%
-  mutate(gender = ifelse(gender==1, "M", "F")) %>%
-  #  mutate(g = ifelse(ageRange>= 18, "adult", "child")) %>%
-  #  left_join(data.frame(g = c("adult", "child"), new = c(pr_adult_pop, pr_child_pop)), by = "g") %>%
-  # group_by(g) %>%
-  #  mutate(poblacion = poblacion/sum(poblacion)*new) %>%
-  #  ungroup() %>%
-  mutate(ageRange = factor(as.character(cut(ageRange, c(breaks, Inf), right = FALSE,
-                                            labels = labels)), levels = labels)) %>%
-  group_by(ageRange, gender) %>%
-  summarize(poblacion = sum(poblacion), .groups = "drop")  %>%
-  mutate(gender = factor(gender)) %>%
-  as.data.table() 
+v20 <- load_variables(2020, "acs5", cache = TRUE)
+tmp <- v20 %>% filter(concept == "SEX BY AGE" & str_detect(label,"years")) 
+acs_labels <- tmp$name
+names(acs_labels) <- tmp$label %>% 
+  str_remove(" years") %>%
+  str_replace("Under 5", "0-4") %>%
+  str_replace("and over", "-Inf") %>%
+  str_remove("Estimate\\!\\!Total:\\!\\!") %>%
+  str_replace(":\\!\\!", "_") %>%
+  str_remove_all("\\s+") %>%
+  str_replace("and|to", "-") 
 
-pr_pop <- sum(pop_by_age_gender$poblacion)
-pr_adult_pop <- sum(pop_by_age_gender[!ageRange %in% c("0-4", "5-11", "12-15", "16-17")]$poblacion)
+dat <- get_acs(geography = "state", 
+               variables = acs_labels,
+               state = "PR",
+               year = 2020) 
 
+raw_pop <- dat %>% 
+  mutate(se = replace_na(moe, 0) / qnorm(0.95)) %>%  
+  separate(variable, c("gender", "ageRange"), sep="_") %>%
+  separate(ageRange, c("start", "end"), sep="-", fill = "right") %>%
+  select(start, end, gender, estimate, se) %>%
+  mutate(start=as.numeric(start), end=as.numeric(end)) %>%
+  mutate(end = ifelse(is.na(end), start, end),
+         ageRange = paste(start, end, sep="-")) %>%
+  mutate(gender = factor(recode(gender, Male="M", Female = "F"))) 
+  
 
-pop_by_age_gender_municipio <- 
-  read_csv("data/PRM-EST2020-AGESEX.csv",  locale = locale(encoding = "ISO-8859-1"))  %>% filter(YEAR == 13) %>%
-  select(NAME, matches("AGE.+_[FEM|MALE]")) %>%
-  pivot_longer(-NAME) %>%
-  mutate(name = str_remove(name, "AGE")) %>%
-  separate(name, c("age","gender")) %>%
-  mutate(age = recode(age, `04` = "0004", `59` = "0509", `513` = "0513")) %>% 
-  pivot_wider(names_from = age, values_from = value) %>% 
-  mutate(`1013` = `0513`-`0509`,
-         `1017` = `1013` + `1417`,
-         `85Inf` = `85PLUS`) %>%
-  mutate(`0511` = 0.5* `0509` * 7/5 + 0.5 * `0513`*7/9,
-         `1215` = `1017` * 4/8, 
-         `1617` = `1017` * 2/8) %>%
-  select(NAME, gender, "0004", "0511", "1215", "1617", "1824", "2529", "3034", "3539", "4044",
-         "4549", "5054", "5559", "6064", "6569", "7074", "7579", "8084", "85Inf") %>%
-  rename(municipio =  NAME) %>% 
-  mutate(municipio = str_remove(municipio, " Municipio")) %>%
-  mutate(gender = recode(gender, MALE = "M", FEM = "F")) %>%
-  pivot_longer(-c("municipio","gender"),names_to = "age", values_to = "poblacion") %>%
-  mutate(age_start = as.numeric(str_extract(age, "\\d{2}")),
-         age_end = as.numeric(str_remove(age, "\\d{2}"))) %>%
-  mutate(ageRange = cut(age_start, c(age_starts, Inf), right = FALSE, labels = labels)) %>% 
-  group_by(municipio, ageRange, gender) %>%
-  summarize(poblacion = sum(poblacion), .groups = "drop") %>%
-  mutate(ageRange = factor(ageRange, levels = labels))  %>%
-  as.data.table() 
+# By municipio ------------------------------------------------------------
 
 
-correction <- pop_by_age_gender_municipio %>% group_by(ageRange, gender) %>% 
-  summarize(poblacion=sum(poblacion), .groups = "drop") %>%
-  left_join(pop_by_age_gender, by = c("ageRange","gender")) %>%
-  mutate(correction = poblacion.y / poblacion.x) %>% 
-  select(-contains("poblacion"))
+dat_muni <- get_acs(geography = "county", 
+                    variables = acs_labels,
+                    state = "PR",
+                    year = 2020) 
 
-pop_by_age_gender_municipio <- pop_by_age_gender_municipio  %>%
-  right_join(correction, by = c("ageRange", "gender")) %>%
-  mutate(poblacion = poblacion*correction) %>%
-  select(-correction) 
+raw_pop_municipio <- dat_muni %>% 
+  mutate(NAME = str_remove(NAME, " Municipio, Puerto Rico")) %>%
+  rename(municipio = NAME) %>%
+  mutate(se = replace_na(moe, 0) / qnorm(0.95)) %>%  
+  separate(variable, c("gender", "ageRange"), sep="_") %>%
+  separate(ageRange, c("start", "end"), sep="-", fill = "right") %>%
+  select(municipio, start, end, gender, estimate, se) %>%
+  mutate(start=as.numeric(start), end=as.numeric(end)) %>%
+  mutate(end = ifelse(is.na(end), start, end),
+         ageRange = paste(start, end, sep="-")) %>%
+  mutate(gender = factor(recode(gender, Male="M", Female = "F")))
 
-pop_by_age_gender_municipio[,municipio := reorder(municipio, -poblacion, sum)]
-setcolorder(pop_by_age_gender_municipio, c("municipio", "ageRange", "gender", "poblacion"))
+## split 10-14
 
-muni_order <- pop_by_age_gender_municipio %>%
-  group_by(municipio) %>% summarize(n=sum(poblacion), .groups="drop") 
-save(pr_pop, pr_adult_pop, pop_by_age_gender, pop_by_age_gender_municipio, 
+split_10_14 <- function(tab){
+  return(data.frame(start=c(10,12), end=c(11,14), 
+                    gender = tab$gender,
+                    estimate=tab$estimate*c(2,3)/5,
+                    se = tab$se*sqrt(c(2/3)/5),
+                    ageRange=c("10-11", "12-14")))
+}
+  
+tmp_10_14 <- filter(raw_pop, ageRange=="10-14") %>%
+  group_by(gender) %>%
+  do(split_10_14(.))
+
+raw_pop <- raw_pop %>%
+  filter(ageRange!="10-14") %>%
+  bind_rows(tmp_10_14) 
+
+age_levels <- paste(sort(unique(raw_pop$start)),
+                    sort(unique(raw_pop$end)), sep="-")
+
+raw_pop <- raw_pop %>%
+  mutate(ageRange = factor(ageRange, levels=age_levels)) %>%
+  arrange(ageRange, gender)
+
+
+tmp_10_14 <- filter(raw_pop_municipio, ageRange=="10-14") %>%
+  group_by(gender, municipio) %>%
+  do(split_10_14(.))
+
+raw_pop_municipio <- raw_pop_municipio %>%
+  filter(ageRange!="10-14") %>%
+  bind_rows(tmp_10_14) 
+
+raw_pop_municipio <- raw_pop_municipio  %>%
+  mutate(ageRange = factor(ageRange, levels=age_levels)) %>%
+  arrange(municipio, ageRange, gender)
+  
+
+raw_pop <- setDT(raw_pop)
+setnames(raw_pop, "estimate", "poblacion")
+setcolorder(raw_pop, c("ageRange", "start", "end", "gender", "poblacion", "se"))
+raw_pop_municipio <- setDT(raw_pop_municipio)
+setnames(raw_pop_municipio, "estimate", "poblacion")
+setcolorder(raw_pop_municipio, c("municipio", "ageRange", "start", "end", "gender", "poblacion", "se"))
+
+## test: check if sum of municipios adds up to total
+# tmp <- raw_pop_municipio[,.(poblacion=sum(poblacion), se=sqrt(sum(se^2))), 
+#                          by = c("ageRange", "gender")]
+# tmp <- merge(tmp, raw_pop, by = c("ageRange", "gender"))
+# tmp%>%ggplot(aes(poblacion.x, poblacion.y, label=ageRange))+
+#   geom_text()+geom_abline()
+# tmp%>%ggplot(aes(se.x, se.y, label=ageRange))+
+#   geom_text()+geom_abline()
+
+pr_pop <- sum(raw_pop$poblacion)
+pr_pop_se <- sqrt(sum(raw_pop$se^2))
+
+pr_adult_pop <- sum(raw_pop[end<=17]$poblacion)
+pr_adult_pop_se <- sqrt(sum(raw_pop[end<=17]$se))
+
+save(pr_pop, pr_adult_pop, raw_pop, raw_pop_municipio, 
      file = file.path(rda_path, "population-tabs.rda"))
+
+
+
 
 
