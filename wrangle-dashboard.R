@@ -24,9 +24,9 @@ collapse_age <- function(tab, age_starts){
                         right = FALSE, include.lowest = TRUE, 
                         labels = labels)]
   ret[, c("start", "end") := NULL]
+  
   vars <- c("poblacion", "se")
   cols <- setdiff(names(ret), vars)
-  
   ret[, se := se^2]
   ret <- ret[, lapply(.SD, sum), keyby = cols, .SDcols = vars]
   ret[, se := sqrt(se)]
@@ -43,6 +43,7 @@ pop_by_age_gender <- collapse_age(raw_pop, age_starts)
 pop_by_age_gender_municipio <- collapse_age(raw_pop_municipio, age_starts)
 
 age_levels <- levels(pop_by_age_gender$ageRange)
+## Check if it matches
 # tmp <- pop_by_age_gender_municipio[,.(poblacion=sum(poblacion), se=sqrt(sum(se^2))),
 #                          by = c("ageRange", "gender")]
 # tmp <- merge(tmp, pop_by_age_gender, by = c("ageRange", "gender"))
@@ -335,7 +336,6 @@ piramide <- bind_rows(tab, tab_muni)
 
 piramide_tab <- daily_vax_counts %>%   
   left_join(pop_by_age_gender, by = c("ageRange", "gender")) %>%
-  select(-poblacion_2010) %>%
   mutate(poblacion = poblacion_2020) %>%
   collapse_age(vars=c("onedose", "full","booster","lost", "poblacion")) %>%
   filter(gender %in% c("M", "F")) %>%
