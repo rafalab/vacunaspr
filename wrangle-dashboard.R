@@ -37,7 +37,7 @@ collapse_age <- function(tab, age_starts){
 
 
 load(file.path(rda_path, "population-tabs.rda"))
-muni_levels <- c(levels(pop_by_age_gender_municipio$municipio), "No reportado")
+muni_levels <- c(levels(raw_pop_municipio$municipio), "No reportado")
 
 age_starts <- c(0, 5, 12, 18, 30, 40, 50, 60, 70, 80)
 pop_by_age_gender <- collapse_age(raw_pop, age_starts)
@@ -505,7 +505,7 @@ message("Wrangling cases.")
 
 collapsed_age_starts <- c(0, 5, 12, 18, 45, 65)
 collapsed_pop_by_age_gender <- collapse_age(raw_pop, collapsed_age_starts)
-collapsed_age_levels <- levels(collapsed_age_levels$ageRange)
+collapsed_age_levels <- levels(collapsed_pop_by_age_gender$ageRange)
 
 load(file.path(rda_path, "dat_vax_SYA.rda"))
 
@@ -747,7 +747,7 @@ daily_counts <- daily_counts[, keyby = .(date, ageRange, gender, outcome, status
 
 daily_counts <- daily_counts[order(date)]
 
-daily_counts %>% ggplot(aes(date, poblacion, color = manu, lty=gender))+geom_line() + facet_grid(status~ageRange)
+#daily_counts %>% ggplot(aes(date, poblacion, color = manu, lty=gender))+geom_line() + facet_grid(status~ageRange)
 ## Compute cases, hosp and death rates
 ## Include other genders in totals
 last_day_counts <- last_day
