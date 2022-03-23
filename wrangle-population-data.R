@@ -117,9 +117,9 @@ pr_pop <- sum(raw_pop$poblacion)
 pr_pop_se <- sqrt(sum(raw_pop$se^2))
 
 pr_adult_pop <- sum(raw_pop[end<=17]$poblacion)
-pr_adult_pop_se <- sqrt(sum(raw_pop[end<=17]$se))
+pr_adult_pop_se <- sqrt(sum(raw_pop[end<=17]$se^2))
 
-save(pr_pop, pr_adult_pop, raw_pop, raw_pop_municipio, 
+save(pr_pop, pr_pop_se, pr_adult_pop, pr_adult_pop_se, raw_pop, raw_pop_municipio, 
      file = file.path(rda_path, "population-tabs.rda"))
 
 
