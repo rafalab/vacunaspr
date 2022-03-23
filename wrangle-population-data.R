@@ -48,6 +48,7 @@ dat_muni <- get_acs(geography = "county",
 raw_pop_municipio <- dat_muni %>% 
   mutate(NAME = str_remove(NAME, " Municipio, Puerto Rico")) %>%
   rename(municipio = NAME) %>%
+  mutate(municipio = factor(municipio)) %>%
   mutate(se = replace_na(moe, 0) / qnorm(0.95)) %>%  
   separate(variable, c("gender", "ageRange"), sep="_") %>%
   separate(ageRange, c("start", "end"), sep="-", fill = "right") %>%
