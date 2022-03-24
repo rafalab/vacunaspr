@@ -20,11 +20,16 @@ collapse_age <- function(tab, age_starts){
                         labels = labels)]
   ret[, c("start", "end") := NULL]
   
-  vars <- c("poblacion", "se")
+  vars <- "poblacion"
+  
+  if("se" %in% names(ret)){ ret[, se := se^2]; vars <- c(vars, "se")}
+  
   cols <- setdiff(names(ret), vars)
-  ret[, se := se^2]
+  
   ret <- ret[, lapply(.SD, sum), keyby = cols, .SDcols = vars]
-  ret[, se := sqrt(se)]
+  
+  if("se" %in% names(ret)) ret[, se := sqrt(se)]
+  
   ret[, ageRange := factor(ageRange, levels = labels)]
   
   return(ret[])
