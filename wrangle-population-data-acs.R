@@ -2,15 +2,16 @@ library(tidyverse)
 library(lubridate)
 library(data.table)
 library(tidycensus)
+library(splines)
 
-if(Sys.info()["nodename"] == "fermat.dfci.harvard.edu"){
-  rda_path <- "/homes10/rafa/dashboard/vacunaspr/rdas"
-} else{
-  rda_path <- "rdas"
-}
+rda_path <- "rdas"
 
-v20 <- load_variables(2020, "acs5", cache = TRUE)
-tmp <- v20 %>% filter(concept == "SEX BY AGE" & str_detect(label,"years")) 
+
+# Define variables --------------------------------------------------------
+
+
+vars <- load_variables(2019, "acs1", cache = TRUE)
+tmp <- vars %>% filter(concept == "SEX BY AGE" & str_detect(label,"years")) 
 acs_labels <- tmp$name
 names(acs_labels) <- tmp$label %>% 
   str_remove(" years") %>%
@@ -21,106 +22,131 @@ names(acs_labels) <- tmp$label %>%
   str_remove_all("\\s+") %>%
   str_replace("and|to", "-") 
 
-dat <- get_acs(geography = "state", 
-               variables = acs_labels,
-               state = "PR",
-               year = 2020) 
+
+# Download acs data for each year -----------------------------------------
+
+
+dat <- map_df(c(2006:2017,2019), function(y){
+  tmp <- get_acs(geography = "state", 
+                 variables = acs_labels,
+                 state = "PR",
+                 year = y,
+                 survey = "acs1")
+  tmp$year <- y
+  return(tmp)
+})
+
+
+# wrangle data ------------------------------------------------------------
+
 
 raw_pop <- dat %>% 
   mutate(se = replace_na(moe, 0) / qnorm(0.95)) %>%  
   separate(variable, c("gender", "ageRange"), sep="_") %>%
   separate(ageRange, c("start", "end"), sep="-", fill = "right") %>%
-  select(start, end, gender, estimate, se) %>%
+  select(year, start, end, gender, estimate, se) %>%
   mutate(start=as.numeric(start), end=as.numeric(end)) %>%
-  mutate(end = ifelse(is.na(end), start, end),
-         ageRange = paste(start, end, sep="-")) %>%
-  mutate(gender = factor(recode(gender, Male="M", Female = "F"))) 
-  
-
-# By municipio ------------------------------------------------------------
+  mutate(end = ifelse(is.na(end), start, end)) %>%
+  rename(poblacion = estimate) %>% 
+  mutate(gender = factor(recode(gender, Male="M", Female = "F"))) %>%
+  mutate(date = make_date(year, 7, 1))
 
 
-dat_muni <- get_acs(geography = "county", 
-                    variables = acs_labels,
-                    state = "PR",
-                    year = 2020) 
+# extrapolate for 2020 and 2021 -------------------------------------------
+
+
+dates <- make_date(2019:2021, 7, 1) # seq(min(raw_pop$date), make_date(2021, 7, 1), by= "year")
+extrapolate <- function(tab){
+  fit <- lm(poblacion ~ ns(x, 3), data = tab)
+  data.frame(date = dates, 
+             fit = predict(fit, newdata = data.frame(x=as.numeric(dates))))
+}
+
+pred_pop <- raw_pop %>%  
+  mutate(x=as.numeric(date)) %>%
+  group_by(start, end, gender) %>%
+  do(extrapolate(.)) 
+
+### check fit
+if(FALSE){
+  final_pop <- full_join(raw_pop, pred_pop, by = c("date", "start", "end", "gender"))
+  final_pop %>%  
+    mutate(ageRange=paste(start, end, sep="-")) %>%
+    ggplot(aes(date, color = gender))+
+    geom_point(aes(y=poblacion))+
+    geom_line(aes(y=fit))+
+    facet_wrap(~ageRange) +
+    theme_bw()
+}
+
+
+## keep extrapolated population but original SEs
+tmp1 <- pred_pop %>% 
+  mutate(year = paste("poblacion", year(date), sep="_")) %>%
+  select(year, start, end, gender, fit) %>% 
+  pivot_wider(names_from = year, values_from = fit)
+
+tmp2 <- raw_pop %>% filter(year == max(year)) %>% select(start, end, gender, se)
+
+raw_pop <- left_join(tmp1, tmp2, by = c("start", "end", "gender"))
+
+
+# Municipios --------------------------------------------------------------
+
+## for municipios we get 2019 vintage and get age proportions from there
+
+dat_muni <- get_estimates(geography = "county",
+                          product = "characteristics",
+                          breakdown = c("AGEGROUP","SEX"),
+                          breakdown_labels = TRUE,
+                          year= 2019,
+                          state="Puerto Rico")
 
 raw_pop_municipio <- dat_muni %>% 
+  filter(!AGEGROUP %in% c("All ages", "Median age", "85 years and over") & SEX!="Both sexes") %>%
   mutate(NAME = str_remove(NAME, " Municipio, Puerto Rico")) %>%
-  rename(municipio = NAME) %>%
+  rename(municipio = NAME, gender= SEX, poblacion = value) %>%
   mutate(municipio = factor(municipio)) %>%
-  mutate(se = replace_na(moe, 0) / qnorm(0.95)) %>%  
-  separate(variable, c("gender", "ageRange"), sep="_") %>%
-  separate(ageRange, c("start", "end"), sep="-", fill = "right") %>%
-  select(municipio, start, end, gender, estimate, se) %>%
+  mutate(AGEGROUP = str_remove_all(AGEGROUP, "Age\\s|\\syears")) %>%
+  mutate(AGEGROUP = str_replace(AGEGROUP, " and over| and older", " to Inf")) %>%
+  mutate(AGEGROUP = str_replace(AGEGROUP, "Under ", "0 to ")) %>%
+  separate(AGEGROUP, c("start", "end"), sep=" to ", fill = "right") %>%
+  select(municipio, start, end, gender, poblacion) %>%
   mutate(start=as.numeric(start), end=as.numeric(end)) %>%
-  mutate(end = ifelse(is.na(end), start, end),
-         ageRange = paste(start, end, sep="-")) %>%
-  mutate(gender = factor(recode(gender, Male="M", Female = "F")))
-
-## split 10-14
-
-split_10_14 <- function(tab){
-  return(data.frame(start=c(10,12), end=c(11,14), 
-                    gender = tab$gender,
-                    estimate=tab$estimate*c(2,3)/5,
-                    se = tab$se*sqrt(c(2/3)/5),
-                    ageRange=c("10-11", "12-14")))
-}
-  
-tmp_10_14 <- filter(raw_pop, ageRange=="10-14") %>%
-  group_by(gender) %>%
-  do(split_10_14(.))
-
-raw_pop <- raw_pop %>%
-  filter(ageRange!="10-14") %>%
-  bind_rows(tmp_10_14) 
-
-age_levels <- paste(sort(unique(raw_pop$start)),
-                    sort(unique(raw_pop$end)), sep="-")
-
-raw_pop <- raw_pop %>%
-  mutate(ageRange = factor(ageRange, levels=age_levels)) %>%
-  arrange(ageRange, gender)
+  mutate(end = ifelse(is.na(end), start, end)) %>%
+  mutate(gender = factor(recode(gender, Male="M", Female = "F"))) %>%
+  filter(end-start==4 | (start==85 & is.infinite(end)))
 
 
-tmp_10_14 <- filter(raw_pop_municipio, ageRange=="10-14") %>%
-  group_by(gender, municipio) %>%
-  do(split_10_14(.))
+age_starts <- unique(raw_pop_municipio$start)
+breaks <- sort(age_starts)
+labels <- c(paste(breaks[-length(breaks)], c(breaks[-1]-1), sep="-"),
+            paste0(breaks[length(breaks)], "+"))
 
-raw_pop_municipio <- raw_pop_municipio %>%
-  filter(ageRange!="10-14") %>%
-  bind_rows(tmp_10_14) 
+## correction to make totals match
 
-raw_pop_municipio <- raw_pop_municipio  %>%
-  mutate(ageRange = factor(ageRange, levels=age_levels)) %>%
-  arrange(municipio, ageRange, gender)
-  
+total_pop <- raw_pop %>% 
+  mutate(ageRange = cut(start, c(age_starts, Inf), right = FALSE, include.lowest = TRUE, labels = labels))%>%
+  group_by(ageRange, gender) %>%
+  summarize(across(starts_with("poblacion"), ~ sum(.x)), .groups = "drop")
+
+raw_pop_municipio 
+raw_pop_municipio <- raw_pop_municipio %>% 
+  mutate(ageRange = paste(start, end, sep="-") %>% str_replace("-Inf", "+") %>% factor(levels=labels))%>%
+  group_by(ageRange, gender) %>%
+  mutate(total=sum(poblacion))%>%
+  ungroup() %>%
+  mutate(prop = poblacion/total) %>%
+  select(-poblacion) %>%
+  left_join(total_pop, by = c("ageRange","gender")) %>%
+  mutate(across(starts_with("poblacion"), ~  .x * prop)) %>%
+  select(municipio, start, end, gender, starts_with("poblacion"))
 
 raw_pop <- setDT(raw_pop)
-setnames(raw_pop, "estimate", "poblacion")
-setcolorder(raw_pop, c("ageRange", "start", "end", "gender", "poblacion", "se"))
 raw_pop_municipio <- setDT(raw_pop_municipio)
-setnames(raw_pop_municipio, "estimate", "poblacion")
-setcolorder(raw_pop_municipio, c("municipio", "ageRange", "start", "end", "gender", "poblacion", "se"))
 
-## test: check if sum of municipios adds up to total
-# tmp <- raw_pop_municipio[,.(poblacion=sum(poblacion), se=sqrt(sum(se^2))), 
-#                          by = c("ageRange", "gender")]
-# tmp <- merge(tmp, raw_pop, by = c("ageRange", "gender"))
-# tmp%>%ggplot(aes(poblacion.x, poblacion.y, label=ageRange))+
-#   geom_text()+geom_abline()
-# tmp%>%ggplot(aes(se.x, se.y, label=ageRange))+
-#   geom_text()+geom_abline()
+save(raw_pop, raw_pop_municipio, file = file.path(rda_path, "population-tabs-acs.rda"))
 
-pr_pop <- sum(raw_pop$poblacion)
-pr_pop_se <- sqrt(sum(raw_pop$se^2))
-
-pr_adult_pop <- sum(raw_pop[end<=17]$poblacion)
-pr_adult_pop_se <- sqrt(sum(raw_pop[end<=17]$se^2))
-
-save(pr_pop, pr_pop_se, pr_adult_pop, pr_adult_pop_se, raw_pop, raw_pop_municipio, 
-     file = file.path(rda_path, "population-tabs.rda"))
 
 
 

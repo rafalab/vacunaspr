@@ -19,187 +19,187 @@ ui <- fluidPage(
   #-- Google analytics add on
   tags$head(includeHTML(("google-analytics.html"))),
   
-  #titlePanel("Informe de vacunas COVID-19 en Puerto Rico"))
+  titlePanel("Informe de vacunas COVID-19 en Puerto Rico: temporeramente desactivado"))
   # Application title
-  titlePanel("Informe de vacunas COVID-19 en Puerto Rico"),
-
-  tabsetPanel(id = "tabs",
-              tabPanel("Resumen",
-                       htmlOutput("fecha"),
-                       p("Los datos presentados en este dashboard han sido revisados. Por favor visite la ventana de FAQ para más detalles."), 
-                       htmlOutput("summary_1"),
-                       h4("Resumen de casos, hospitalizaciones y muertes"),
-                       p("Los tamaños de los grupos son diferentes por lo cual no es informativo comparar totales sino las tasas (por 100K por día). Los totales no incluyen personas que han dado positivo a una prueba diagnóstica en los últimos 90 días. También tome en cuenta que los datos de vacunas tienen mayor rezago que los de la pruebas."),
-                       radioButtons("summary_type",
-                                    label = "",
-                                    choices = list("Sencillo" = "simple",
-                                                   "Detallado" = "detail"),
-                                    selected = "simple",
-                                    inline = TRUE),
-                       htmlOutput("titulo_3"),
-                       htmlOutput("summary_3"),
-                       htmlOutput("titulo_2"),
-                       htmlOutput("summary_2")
-              ),
-              tabPanel("Eventos",
-                       sidebarLayout(
-                         sidebarPanel(
-                           selectInput("event_type",
-                                       "",
-                                       choice = c(Muertes = "death",
-                                                  Hospitalizaciones = "hosp",
-                                                  Casos = "cases"),
-                                       selected = "death"),
-                           dateRangeInput("event_range", "Periodo",
-                                          start = last_day - days(240),
-                                          end = last_day_counts,
-                                          format = "M-dd-yyyy",
-                                          language = "es",
-                                          width = "100%",
-                                          min = first_day,
-                                          max = last_day_counts),
-                           selectInput("event_agerange",
-                                       "Grupo de Edad",
-                                       choice = c("Agregados" = "all",
-                                                  "Todos" = "facet",
-                                                  rev(collapsed_age_levels[-1])),
-                                       selected = "all"),
-                           selectInput("event_scale",
-                                       "Escala",choice = c("Lineal" = "linear",
-                                                           "Logarítimica" = "log"),
-                                       selected = "linear"),
-                           width = 3),
-                         mainPanel(
-                            plotOutput("muertes_plot"),
-                            DT::dataTableOutput("muertes_tabla"))
-                         )),
-
-              tabPanel("Gráficas",
-                       sidebarLayout(
-                         sidebarPanel(
-                           selectInput("graficas_type",
-                                       "Tipo de gráfico",
-                                       choice = c(Acumulado = "total",
-                                                  Diario = "daily"),
-                                       selected = "total"),
-                           selectInput("graficas_dose",
-                                       "Estado de vacunación",
-                                       choice = c(`Una dosis` = "onedose",
-                                                  `Completa` = "full",
-                                                  `Booster` = "booster",
-                                                  `Sin necesidad de booster` = "immune"),
-                                       selected = "full"),
-                           selectInput("graficas_manu",
-                                       "Tipo de vacuna",
-                                       choice = c(`Agregadas` = "all",
-                                                  `Todas` = "facet",
-                                                  `Pfizer` = "PFR",
-                                                  `Moderna` = "MOD",
-                                                  `J&J` = "JSN"),
-                                       selected = "all"),
-                           selectInput("graficas_agerange",
-                                       "Grupo de Edad",
-                                       choice = c("Agregados" = "all",
-                                                  "Todos" = "facet",
-                                                  rev(dashboard_age_levels[-1])),
-                                       selected = "all"),
-                           dateRangeInput("graficas_range",
-                                          "Periodo",
-                                          start = last_day - days(240),
-                                          end = last_day,
-                                          format = "M-dd-yyyy",
-                                          language = "es",
-                                          width = "100%",
-                                          min = first_day,
-                                          max = last_day),
-                           selectInput("graficas_tasa",
-                                       "Tasa o total",
-                                       choice = c("Tasa" = "tasa",
-                                                  "Total" = "total"),
-                                       selected = "tasa"),
-                           width = 3),
-                         mainPanel(
-                           plotOutput("people_plot"))
-                       )),
-              tabPanel("Municipios",
-                       sidebarLayout(
-                         sidebarPanel(
-                           selectInput("municipio_agerange",
-                                       "Grupo de Edad",
-                                       choice = c("Agregados" = "all",
-                                                  rev(dashboard_age_levels[-1])),
-                                       selected = "all"),
-                           width = 3),
-                         mainPanel(
-                           plotOutput("mapa"),
-                           DT::dataTableOutput("municipio_tabla")
-                         )
-                       )),
-
-
-              tabPanel("Pirámide",
-                       sidebarLayout(
-                         sidebarPanel(
-                           selectInput("piramide_municipio",
-                                       "Municipio",
-                                       choice = c(Todos = "Todos",
-                                                  municipios),
-                                       selected = "Todos"),
-                           width = 3),
-                         mainPanel(
-                           plotOutput("piramide"),
-                           htmlOutput("piramide_tabla")
-                         )
-                       )),
-              tabPanel("Proveedores",
-                       sidebarLayout(
-                         sidebarPanel(
-                           selectInput("proveedor_agerange",
-                                       "Grupo de Edad",
-                                       choice = c("Agregados" = "all",
-                                                  dashboard_age_levels[-1]),
-                                       selected = "Todos"),
-                           selectInput("proveedor_dose",
-                                       "Dosis",
-                                       choice = c("Agregadas" = "all",
-                                                  "Primera" = "Primera",
-                                                  "Segunda" = "Segunda",
-                                                  "Tercera" = "Tercera"),
-                                       selected = "all"),
-                           selectInput("proveedor_manu",
-                                       "Tipo de vacuna",
-                                       choice = c("Agregados" = "all",
-                                                  "Pfizer" = "PFR",
-                                                  "Moderna" = "MOD",
-                                                  "J&J" = "JSN"),
-                                       selected = "all"),
-                           width = 3),
-                         mainPanel(
-                           htmlOutput("proveedores")
-                         )
-                       )),
-              tabPanel("Datos Diarios",
-                       sidebarLayout(
-                         sidebarPanel(
-                           dateRangeInput("tabla_range", "Periodo",
-                                          start = last_day - days(30),
-                                          end = last_day,
-                                          format = "M-dd-yyyy",
-                                          language = "es",
-                                          width = "100%",
-                                          min = first_day,
-                                          max = last_day),
-                           width = 3),
-                         mainPanel(
-                           DT::dataTableOutput("tabla")
-                         )
-                       )),
-              tabPanel("FAQ",
-                       htmlOutput("importantInfo")
-              )
-  ),
-  htmlOutput("update"),
-)
+#   titlePanel("Informe de vacunas COVID-19 en Puerto Rico"),
+# 
+#   tabsetPanel(id = "tabs",
+#               tabPanel("Resumen",
+#                        htmlOutput("fecha"),
+#                        p("Los datos presentados en este dashboard han sido revisados. Por favor visite la ventana de FAQ para más detalles."), 
+#                        htmlOutput("summary_1"),
+#                        h4("Resumen de casos, hospitalizaciones y muertes"),
+#                        p("Los tamaños de los grupos son diferentes por lo cual no es informativo comparar totales sino las tasas (por 100K por día). Los totales no incluyen personas que han dado positivo a una prueba diagnóstica en los últimos 90 días. También tome en cuenta que los datos de vacunas tienen mayor rezago que los de la pruebas."),
+#                        radioButtons("summary_type",
+#                                     label = "",
+#                                     choices = list("Sencillo" = "simple",
+#                                                    "Detallado" = "detail"),
+#                                     selected = "simple",
+#                                     inline = TRUE),
+#                        htmlOutput("titulo_3"),
+#                        htmlOutput("summary_3"),
+#                        htmlOutput("titulo_2"),
+#                        htmlOutput("summary_2")
+#               ),
+#               tabPanel("Eventos",
+#                        sidebarLayout(
+#                          sidebarPanel(
+#                            selectInput("event_type",
+#                                        "",
+#                                        choice = c(Muertes = "death",
+#                                                   Hospitalizaciones = "hosp",
+#                                                   Casos = "cases"),
+#                                        selected = "death"),
+#                            dateRangeInput("event_range", "Periodo",
+#                                           start = last_day - days(240),
+#                                           end = last_day_counts,
+#                                           format = "M-dd-yyyy",
+#                                           language = "es",
+#                                           width = "100%",
+#                                           min = first_day,
+#                                           max = last_day_counts),
+#                            selectInput("event_agerange",
+#                                        "Grupo de Edad",
+#                                        choice = c("Agregados" = "all",
+#                                                   "Todos" = "facet",
+#                                                   rev(collapsed_age_levels[-1])),
+#                                        selected = "all"),
+#                            selectInput("event_scale",
+#                                        "Escala",choice = c("Lineal" = "linear",
+#                                                            "Logarítimica" = "log"),
+#                                        selected = "linear"),
+#                            width = 3),
+#                          mainPanel(
+#                             plotOutput("muertes_plot"),
+#                             DT::dataTableOutput("muertes_tabla"))
+#                          )),
+# 
+#               tabPanel("Gráficas",
+#                        sidebarLayout(
+#                          sidebarPanel(
+#                            selectInput("graficas_type",
+#                                        "Tipo de gráfico",
+#                                        choice = c(Acumulado = "total",
+#                                                   Diario = "daily"),
+#                                        selected = "total"),
+#                            selectInput("graficas_dose",
+#                                        "Estado de vacunación",
+#                                        choice = c(`Una dosis` = "onedose",
+#                                                   `Completa` = "full",
+#                                                   `Booster` = "booster",
+#                                                   `Sin necesidad de booster` = "immune"),
+#                                        selected = "full"),
+#                            selectInput("graficas_manu",
+#                                        "Tipo de vacuna",
+#                                        choice = c(`Agregadas` = "all",
+#                                                   `Todas` = "facet",
+#                                                   `Pfizer` = "PFR",
+#                                                   `Moderna` = "MOD",
+#                                                   `J&J` = "JSN"),
+#                                        selected = "all"),
+#                            selectInput("graficas_agerange",
+#                                        "Grupo de Edad",
+#                                        choice = c("Agregados" = "all",
+#                                                   "Todos" = "facet",
+#                                                   rev(dashboard_age_levels[-1])),
+#                                        selected = "all"),
+#                            dateRangeInput("graficas_range",
+#                                           "Periodo",
+#                                           start = last_day - days(240),
+#                                           end = last_day,
+#                                           format = "M-dd-yyyy",
+#                                           language = "es",
+#                                           width = "100%",
+#                                           min = first_day,
+#                                           max = last_day),
+#                            selectInput("graficas_tasa",
+#                                        "Tasa o total",
+#                                        choice = c("Tasa" = "tasa",
+#                                                   "Total" = "total"),
+#                                        selected = "tasa"),
+#                            width = 3),
+#                          mainPanel(
+#                            plotOutput("people_plot"))
+#                        )),
+#               tabPanel("Municipios",
+#                        sidebarLayout(
+#                          sidebarPanel(
+#                            selectInput("municipio_agerange",
+#                                        "Grupo de Edad",
+#                                        choice = c("Agregados" = "all",
+#                                                   rev(dashboard_age_levels[-1])),
+#                                        selected = "all"),
+#                            width = 3),
+#                          mainPanel(
+#                            plotOutput("mapa"),
+#                            DT::dataTableOutput("municipio_tabla")
+#                          )
+#                        )),
+# 
+# 
+#               tabPanel("Pirámide",
+#                        sidebarLayout(
+#                          sidebarPanel(
+#                            selectInput("piramide_municipio",
+#                                        "Municipio",
+#                                        choice = c(Todos = "Todos",
+#                                                   municipios),
+#                                        selected = "Todos"),
+#                            width = 3),
+#                          mainPanel(
+#                            plotOutput("piramide"),
+#                            htmlOutput("piramide_tabla")
+#                          )
+#                        )),
+#               tabPanel("Proveedores",
+#                        sidebarLayout(
+#                          sidebarPanel(
+#                            selectInput("proveedor_agerange",
+#                                        "Grupo de Edad",
+#                                        choice = c("Agregados" = "all",
+#                                                   dashboard_age_levels[-1]),
+#                                        selected = "Todos"),
+#                            selectInput("proveedor_dose",
+#                                        "Dosis",
+#                                        choice = c("Agregadas" = "all",
+#                                                   "Primera" = "Primera",
+#                                                   "Segunda" = "Segunda",
+#                                                   "Tercera" = "Tercera"),
+#                                        selected = "all"),
+#                            selectInput("proveedor_manu",
+#                                        "Tipo de vacuna",
+#                                        choice = c("Agregados" = "all",
+#                                                   "Pfizer" = "PFR",
+#                                                   "Moderna" = "MOD",
+#                                                   "J&J" = "JSN"),
+#                                        selected = "all"),
+#                            width = 3),
+#                          mainPanel(
+#                            htmlOutput("proveedores")
+#                          )
+#                        )),
+#               tabPanel("Datos Diarios",
+#                        sidebarLayout(
+#                          sidebarPanel(
+#                            dateRangeInput("tabla_range", "Periodo",
+#                                           start = last_day - days(30),
+#                                           end = last_day,
+#                                           format = "M-dd-yyyy",
+#                                           language = "es",
+#                                           width = "100%",
+#                                           min = first_day,
+#                                           max = last_day),
+#                            width = 3),
+#                          mainPanel(
+#                            DT::dataTableOutput("tabla")
+#                          )
+#                        )),
+#               tabPanel("FAQ",
+#                        htmlOutput("importantInfo")
+#               )
+#   ),
+#   htmlOutput("update"),
+# )
               
 server <- function(input, output, session) {
     

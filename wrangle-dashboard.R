@@ -4,13 +4,8 @@ library(lubridate)
 library(scales)
 library(tidycensus)
 
-## if on the server get the latest data
-if(Sys.info()["nodename"] == "fermat.dfci.harvard.edu"){
-  rda_path <- "/homes10/rafa/dashboard/vacunaspr/rdas"
-} else{
-  rda_path <- "rdas"
-}
-
+rda_path <- "rdas"
+pop_year <- 2021
 
 # Age groups --------------------------------------------------------------
 
@@ -35,15 +30,54 @@ collapse_age <- function(tab, age_starts){
   return(ret[])
 }
 
+split_10_14 <- function(tab){
+  tmp1 <- tab[!start %in% c(10,12)]
+  tmp2 <- tab[start %in% c(10,12)]
+  
+  if("se" %in% names(tmp1)){
+    f <- function(tab) data.table(start=c(10,12), end=c(11,14), 
+                                  poblacion=tab$poblacion*c(2,3)/5,
+                                  se = tab$se*sqrt(c(2,3)/5))
+  } else{
+    f <- function(tab) data.table(start=c(10,12), end=c(11,14), 
+                                  poblacion=tab$poblacion*c(2,3)/5)
+  }
+    
+  keys <- setdiff(names(tmp2), c("start", "end", "poblacion", "se"))
+  tmp2 <- tmp2[, f(.SD), by = keys]
+  setcolorder(tmp2, names(tmp1))
+  ret <- rbindlist(list(tmp1, tmp2))[order(start, gender)]
+  return(ret[])
+}
 
-load(file.path(rda_path, "population-tabs.rda"))
+load(file.path(rda_path, "population-tabs-acs.rda"))
 muni_levels <- c(levels(raw_pop_municipio$municipio), "No reportado")
+
+## pick a year to use as population estimates
+setnames(raw_pop, paste0("poblacion_", pop_year), "poblacion")
+out <- str_subset(names(raw_pop), "poblacion_")
+raw_pop[, (out) := NULL]
+setnames(raw_pop_municipio, paste0("poblacion_", pop_year), "poblacion")
+out <- str_subset(names(raw_pop_municipio), "poblacion_")
+raw_pop_municipio[, (out) := NULL]
+
+## split 10-14
+raw_pop <- split_10_14(raw_pop)
+raw_pop_municipio <- split_10_14(raw_pop_municipio)
+
 
 age_starts <- c(0, 5, 12, 18, 30, 40, 50, 60, 70, 80)
 pop_by_age_gender <- collapse_age(raw_pop, age_starts)
 pop_by_age_gender_municipio <- collapse_age(raw_pop_municipio, age_starts)
 
 age_levels <- levels(pop_by_age_gender$ageRange)
+
+pr_pop <- sum(raw_pop$poblacion)
+pr_pop_se <- sqrt(sum(raw_pop$se^2))
+
+pr_adult_pop <- sum(raw_pop[end<=17]$poblacion)
+pr_adult_pop_se <- sqrt(sum(raw_pop[end<=17]$se^2))
+
 ## Check if it matches
 # tmp <- pop_by_age_gender_municipio[,.(poblacion=sum(poblacion), se=sqrt(sum(se^2))),
 #                          by = c("ageRange", "gender")]
@@ -718,7 +752,6 @@ counts[, variant := fcase(date < make_date(2021, 6, 15), "alpha",
                        date >= make_date(2021, 6, 15) & date < make_date(2021,12,8), "delta",
                        date >= make_date(2021, 12, 8), "omicron")]
 counts[, day :=fifelse(status!="UNV", as.numeric(date - vax_date), 0)]
-
 
 
 # Prepare data for dashboard ----------------------------------------------

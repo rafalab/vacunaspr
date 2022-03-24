@@ -17,3 +17,6 @@ preis_credentials.R
 .DS_Store
 misc
 private_rdas
+rsconnect/
+tweets
+reports
