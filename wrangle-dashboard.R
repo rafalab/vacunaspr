@@ -590,7 +590,7 @@ recently_infected[is.na(cases), cases := 0]
 recently_infected[, cases := moving_sum(cases), keyby = .(ageRange, gender)]
 #recently_infected[date>=first_day & gender %in% c("F","M")] %>% ggplot(aes(date, cases, color = gender))+geom_line() + facet_wrap(~ageRange)
 pop_susceptible <- merge(recently_infected[date>=first_day & gender %in% c("F","M")], 
-                         collapsed_pop_by_age_gender,  by = c("ageRange", "gender"), all.x=TRUE)
+                         pop_by_age_gender,  by = c("ageRange", "gender"), all.x=TRUE)
 pop_susceptible[, poblacion := poblacion - cases]
 pop_susceptible[, cases := NULL]
 
