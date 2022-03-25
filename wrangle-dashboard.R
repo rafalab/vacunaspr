@@ -5,7 +5,7 @@ library(scales)
 library(tidycensus)
 
 rda_path <- "rdas"
-pop_year <- 2021
+pop_year <- 2020
 
 # Age groups --------------------------------------------------------------
 
@@ -69,7 +69,6 @@ raw_pop_municipio[, (out) := NULL]
 ## split 10-14
 raw_pop <- split_10_14(raw_pop)
 raw_pop_municipio <- split_10_14(raw_pop_municipio)
-
 
 age_starts <- c(0, 5, 12, 18, 30, 40, 50, 60, 70, 80)
 pop_by_age_gender <- collapse_age(raw_pop, age_starts)
@@ -542,20 +541,21 @@ summary_tab <- data.frame(names = c("Vacunas administradas",
 
 message("Wrangling cases.")
 
-collapsed_age_starts <- c(0, 5, 12, 18, 45, 65)
-collapsed_pop_by_age_gender <- collapse_age(raw_pop, collapsed_age_starts)
-collapsed_age_levels <- levels(collapsed_pop_by_age_gender$ageRange)
-
-load(file.path(rda_path, "dat_vax_SYA.rda"))
+# collapsed_age_starts <- c(0, 5, 12, 18, 45, 65)
+# collapsed_pop_by_age_gender <- collapse_age(raw_pop, collapsed_age_starts)
+# collapsed_age_levels <- levels(collapsed_pop_by_age_gender$ageRange)
+# 
+# load(file.path(rda_path, "dat_vax_SYA.rda"))
 
 load(file.path(rda_path, "dat_cases_vax_SYA.rda"))
 dat_cases_vax[is.na(date) & !is.na(date_death), date := date_death]
 
 ## collapse ages
-collapse_func <- function(x)
-  cut(x, c(collapsed_age_starts, Inf),  right = FALSE, include.lowest = TRUE, labels = collapsed_age_levels)
-cols <- str_subset(names(dat_vax), "ageRange")
-dat_vax[, (cols) := lapply(.SD, collapse_func), .SDcols = cols]
+# collapse_func <- function(x)
+#   cut(x, c(collapsed_age_starts, Inf),  right = FALSE, include.lowest = TRUE, labels = collapsed_age_levels)
+# 
+# cols <- str_subset(names(dat_vax), "ageRange")
+# dat_vax[, (cols) := lapply(.SD, collapse_func), .SDcols = cols]
 
 cols <- str_subset(names(dat_cases_vax), "ageRange")
 dat_cases_vax[, (cols) := lapply(.SD, collapse_func), .SDcols = cols]
@@ -766,6 +766,20 @@ counts[, day :=fifelse(status!="UNV", as.numeric(date - vax_date), 0)]
 
 daily_counts <- copy(counts)
 
+collapsed_age_starts <- c(0, 5, 12, 18, 45, 65)
+collapsed_age_levels <- c(paste(collapsed_age_starts[-length(collapsed_age_starts)], c(collapsed_age_starts[-1]-1), sep="-"),
+            paste0(collapsed_age_starts[length(collapsed_age_starts)], "+"))
+
+collapse_func <- function(x)
+   cut(x, c(collapsed_age_starts, Inf),  right = FALSE, include.lowest = TRUE, labels = collapsed_age_levels)
+
+daily_counts <- daily_counts %>%
+  mutate(ageRange = as.numeric(str_remove(ageRange,"[-|+]\\d*"))) %>%
+  mutate(ageRange=collapse_func(ageRange)) 
+vars <-   c("poblacion", "obs")
+cols  <- setdiff(names(daily_counts), vars)
+daily_counts <- daily_counts[, lapply(.SD, sum), keyby = cols, .SDcols = vars]
+ 
 daily_counts <- daily_counts[!(ageRange == "0-4" |
                                  (ageRange %in% c("5-11", "12-17") & manu%in%c("MOD", "JSN")) |
                                  (ageRange == "5-11" & status != "UNV" & vax_date<first_ped_day) |
