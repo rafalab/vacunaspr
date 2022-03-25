@@ -55,8 +55,8 @@ raw_pop <- dat %>%
 # extrapolate for 2020 and 2021 -------------------------------------------
 
 
-#dates <- make_date(c(unique(raw_pop$year), 2020,2021), 7, 1) # seq(min(raw_pop$date), make_date(2021, 7, 1), by= "year")
-dates <- make_date(c(2020,2021), 7, 1) # seq(min(raw_pop$date), make_date(2021, 7, 1), by= "year")
+dates <- make_date(c(unique(raw_pop$year), 2020,2021), 7, 1) # seq(min(raw_pop$date), make_date(2021, 7, 1), by= "year")
+#dates <- make_date(c(2020,2021), 7, 1) # seq(min(raw_pop$date), make_date(2021, 7, 1), by= "year")
 extrapolate <- function(tab){
   fit <- lm(poblacion ~ gender + x, data = tab)
   ret <-  expand.grid(gender=c("M","F"), date=dates) %>% mutate(x=as.numeric(date))

@@ -5,7 +5,7 @@ library(scales)
 library(tidycensus)
 
 rda_path <- "rdas"
-pop_year <- 2020
+pop_year <- 2019
 
 # Age groups --------------------------------------------------------------
 
