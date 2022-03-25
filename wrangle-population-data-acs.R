@@ -26,7 +26,7 @@ names(acs_labels) <- tmp$label %>%
 # Download acs data for each year -----------------------------------------
 
 
-dat <- map_df(c(2006:2017,2019), function(y){
+dat <- map_df(c(2017:2019), function(y){
   tmp <- get_acs(geography = "state", 
                  variables = acs_labels,
                  state = "PR",
@@ -55,22 +55,24 @@ raw_pop <- dat %>%
 # extrapolate for 2020 and 2021 -------------------------------------------
 
 
-dates <- make_date(2019:2021, 7, 1) # seq(min(raw_pop$date), make_date(2021, 7, 1), by= "year")
+#dates <- make_date(c(unique(raw_pop$year), 2020,2021), 7, 1) # seq(min(raw_pop$date), make_date(2021, 7, 1), by= "year")
+dates <- make_date(c(2020,2021), 7, 1) # seq(min(raw_pop$date), make_date(2021, 7, 1), by= "year")
 extrapolate <- function(tab){
-  fit <- lm(poblacion ~ ns(x, 3), data = tab)
-  data.frame(date = dates, 
-             fit = predict(fit, newdata = data.frame(x=as.numeric(dates))))
+  fit <- lm(poblacion ~ gender + x, data = tab)
+  ret <-  expand.grid(gender=c("M","F"), date=dates) %>% mutate(x=as.numeric(date))
+  ret$fit <- predict(fit, newdata =ret)
+  return(ret)
 }
 
 pred_pop <- raw_pop %>%  
   mutate(x=as.numeric(date)) %>%
-  group_by(start, end, gender) %>%
+  group_by(start, end) %>%
   do(extrapolate(.)) 
 
 ### check fit
 if(FALSE){
   final_pop <- full_join(raw_pop, pred_pop, by = c("date", "start", "end", "gender"))
-  final_pop %>%  
+  final_pop %>% #filter(start %in% c(10,15)) %>%
     mutate(ageRange=paste(start, end, sep="-")) %>%
     ggplot(aes(date, color = gender))+
     geom_point(aes(y=poblacion))+
@@ -81,12 +83,15 @@ if(FALSE){
 
 
 ## keep extrapolated population but original SEs
-tmp1 <- pred_pop %>% 
+
+tmp1 <- raw_pop %>% filter(year == max(year)) %>% select(start, end, gender, poblacion, se) %>%
+  rename(poblacion_2019 = poblacion) 
+
+tmp2 <- pred_pop %>% 
   mutate(year = paste("poblacion", year(date), sep="_")) %>%
   select(year, start, end, gender, fit) %>% 
   pivot_wider(names_from = year, values_from = fit)
 
-tmp2 <- raw_pop %>% filter(year == max(year)) %>% select(start, end, gender, se)
 
 raw_pop <- left_join(tmp1, tmp2, by = c("start", "end", "gender"))
 
