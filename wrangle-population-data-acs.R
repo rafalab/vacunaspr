@@ -55,8 +55,8 @@ raw_pop <- dat %>%
 # extrapolate for 2020 and 2021 -------------------------------------------
 
 
-dates <- make_date(c(unique(raw_pop$year), 2020,2021), 7, 1) # seq(min(raw_pop$date), make_date(2021, 7, 1), by= "year")
-#dates <- make_date(c(2020,2021), 7, 1) # seq(min(raw_pop$date), make_date(2021, 7, 1), by= "year")
+#dates <- make_date(c(unique(raw_pop$year), 2020,2021), 7, 1) # seq(min(raw_pop$date), make_date(2021, 7, 1), by= "year")
+dates <- make_date(c(2020,2021), 7, 1) # seq(min(raw_pop$date), make_date(2021, 7, 1), by= "year")
 extrapolate <- function(tab){
   fit <- lm(poblacion ~ gender + x, data = tab)
   ret <-  expand.grid(gender=c("M","F"), date=dates) %>% mutate(x=as.numeric(date))
@@ -82,7 +82,7 @@ if(FALSE){
 }
 
 
-## keep extrapolated population but original SEs
+## add 2020 and 2021 predictions
 
 tmp1 <- raw_pop %>% filter(year == max(year)) %>% select(start, end, gender, poblacion, se) %>%
   rename(poblacion_2019 = poblacion) 
@@ -92,9 +92,7 @@ tmp2 <- pred_pop %>%
   select(year, start, end, gender, fit) %>% 
   pivot_wider(names_from = year, values_from = fit)
 
-
-raw_pop <- left_join(tmp1, tmp2, by = c("start", "end", "gender")) %>% 
-  rename(poblacion_2019 = poblacion_2019.y)
+raw_pop <- left_join(tmp1, tmp2, by = c("start", "end", "gender")) 
 
 # Municipios --------------------------------------------------------------
 
