@@ -621,7 +621,7 @@ pop_vax <- dat_vax[!is.na(vax_date) & vax_date <= last_day &
 setnames(pop_vax, c("vax_date", "manu", "ageRange", "gender", "date", "poblacion"))
 setcolorder(pop_vax, c("date", "vax_date", "manu", "ageRange", "gender", "poblacion"))
 pop_vax$manu <- factor(pop_vax$manu, levels = manu_levels)
-pop_vax$ageRange <- factor(pop_vax$ageRange, levels = collapsed_age_levels)
+pop_vax$ageRange <- factor(pop_vax$ageRange, levels = age_levels)
 pop_vax <- pop_vax[order(manu, ageRange, gender, date, vax_date)]
 #pop_vax %>% group_by(date,ageRange, manu) %>% summarize(n=sum(poblacion)) %>% ggplot(aes(date,n,color=manu))+geom_line()+facet_wrap(~ageRange)
 
@@ -637,7 +637,7 @@ pop_par <- dat_vax[!is.na(date_1) & date_1 <= last_day &
 setnames(pop_par, c("vax_date", "manu", "ageRange", "gender", "date", "poblacion"))
 setcolorder(pop_par, c("date", "vax_date", "manu", "ageRange", "gender", "poblacion"))
 pop_par$manu <- factor(pop_par$manu, levels = manu_levels)
-pop_par$ageRange <- factor(pop_par$ageRange, levels = collapsed_age_levels)
+pop_par$ageRange <- factor(pop_par$ageRange, levels = age_levels)
 pop_par <- pop_par[order(manu, ageRange, gender, date, vax_date)]
 #pop_par %>% group_by(date,ageRange, manu) %>% summarize(n=sum(poblacion)) %>% ggplot(aes(date,n,color=manu))+geom_line()+facet_wrap(~ageRange)
 
