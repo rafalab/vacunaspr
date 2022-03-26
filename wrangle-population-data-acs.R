@@ -93,8 +93,8 @@ tmp2 <- pred_pop %>%
   pivot_wider(names_from = year, values_from = fit)
 
 
-raw_pop <- left_join(tmp1, tmp2, by = c("start", "end", "gender"))
-
+raw_pop <- left_join(tmp1, tmp2, by = c("start", "end", "gender")) %>% 
+  rename(poblacion_2019 = poblacion_2019.y)
 
 # Municipios --------------------------------------------------------------
 
