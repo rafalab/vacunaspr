@@ -55,6 +55,7 @@ recently_infected[, cases := moving_sum(cases), keyby = .(ageRange, gender)]
 pop_susceptible <- merge(recently_infected[date>=first_day & gender %in% c("F","M")], 
                          counts_pop_by_age_gender,  by = c("ageRange", "gender"), all.x=TRUE)
 pop_susceptible[, poblacion := poblacion - cases]
+setnames(pop_susceptible, "se", "se_poblacion")
 pop_susceptible[, cases := NULL]
 
 ### Compute number with and without booster for each day after vaccinated
@@ -137,7 +138,7 @@ setnames(pop_unvax, "ageRange_1", "ageRange")
 pop_unvax <- merge(pop_unvax, pop_susceptible, all.x = TRUE, 
                    by = c("date", "ageRange", "gender")) 
 pop_unvax[, poblacion := poblacion - total]
-pop_unvax <- pop_unvax[,c("date", "ageRange","gender", "poblacion")]
+pop_unvax <- pop_unvax[,c("date", "ageRange","gender", "poblacion", "se_poblacion")]
 
 #pop_unvax %>% ggplot(aes(date,poblacion, color=gender))+geom_line()+facet_wrap(~ageRange)
 #pop_unvax %>% ggplot(aes(date, poblacion_2010/poblacion, color = gender)) + geom_line() + facet_wrap(~ageRange, scales="free_y")
@@ -172,7 +173,7 @@ vax <- merge(pop_vax, vax, by = c("manu", "ageRange", "gender", "date", "vax_dat
 vax[is.na(vax)] <- 0
 vax <- melt(vax, measure.vars = c("cases", "hosp", "death"),
             variable.name = "outcome", value.name = "obs")
-vax[,`:=`(primary_manu=NA, status = "VAX")]
+vax[,`:=`(primary_manu = NA, status = "VAX", se_poblacion = NA)]
 
 message("Computing daily counts.")
 
@@ -182,7 +183,7 @@ par <- par[, .(cases = .N, hosp = sum(hosp), death = sum(death)), keyby = .(manu
 par <- merge(pop_par, par, by = c("manu", "ageRange", "gender", "date", "vax_date"), all.x = TRUE) 
 par[is.na(par)] <- 0
 par <- melt(par, measure.vars = c("cases", "hosp", "death"), variable.name = "outcome", value.name = "obs")
-par[,`:=`(primary_manu=NA, status = "PAR")]
+par[,`:=`(primary_manu=NA, status = "PAR", se_poblacion = NA)]
 
 
 bst <- dat_cases_vax[status == "BST" & gender %in% c("F", "M") & booster_ageRange != "0-4"]
@@ -196,7 +197,8 @@ bst <- bst[!is.na(poblacion),]
 setnames(bst, c("manu_1","booster_manu", "booster_date", "booster_ageRange"), 
          c("primary_manu", "manu", "vax_date", "ageRange"))
 bst <- melt(bst, measure.vars = c("cases", "hosp", "death"), variable.name = "outcome", value.name = "obs")
-bst[, status := "BST"]
+bst[, `:=`(status = "BST", se_poblacion = NA)]
+
 
 unvax <- dat_cases_vax[status == "UNV" & gender %in% c("F", "M")]
 unvax <- unvax[, .(cases = .N, hosp = sum(hosp), death = sum(death)), keyby = .(date, ageRange, gender)]
