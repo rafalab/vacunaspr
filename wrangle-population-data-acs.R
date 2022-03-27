@@ -26,7 +26,7 @@ names(acs_labels) <- tmp$label %>%
 # Download acs data for each year -----------------------------------------
 
 
-dat <- map_df(c(2017:2019), function(y){
+dat <- map_df(c(2015:2019), function(y){
   tmp <- get_acs(geography = "state", 
                  variables = acs_labels,
                  state = "PR",
@@ -36,9 +36,7 @@ dat <- map_df(c(2017:2019), function(y){
   return(tmp)
 })
 
-
 # wrangle data ------------------------------------------------------------
-
 
 raw_pop <- dat %>% 
   mutate(se = replace_na(moe, 0) / qnorm(0.95)) %>%  
@@ -53,7 +51,6 @@ raw_pop <- dat %>%
 
 
 # extrapolate for 2020 and 2021 -------------------------------------------
-
 
 #dates <- make_date(c(unique(raw_pop$year), 2020,2021), 7, 1) # seq(min(raw_pop$date), make_date(2021, 7, 1), by= "year")
 dates <- make_date(c(2020,2021), 7, 1) # seq(min(raw_pop$date), make_date(2021, 7, 1), by= "year")
@@ -102,8 +99,8 @@ dat_muni <- get_estimates(geography = "county",
                           product = "characteristics",
                           breakdown = c("AGEGROUP","SEX"),
                           breakdown_labels = TRUE,
-                          year= 2019,
-                          state="Puerto Rico")
+                          year = 2019,
+                          state ="Puerto Rico")
 
 raw_pop_municipio <- dat_muni %>% 
   filter(!AGEGROUP %in% c("All ages", "Median age", "85 years and over") & SEX!="Both sexes") %>%

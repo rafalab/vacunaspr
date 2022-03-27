@@ -258,10 +258,10 @@ server <- function(input, output, session) {
   
   
    output$muertes_plot <- renderPlot({
-     load(file.path(rda_path, "daily_counts.rda"))
+     load(file.path(rda_path, "dashboard_counts.rda"))
      load(file.path(rda_path, "dates.rda"))
      
-     daily_counts <- daily_counts %>% filter(outcome==input$event_type)
+     counts <- counts %>% filter(outcome==input$event_type)
      
      the_title <- case_when(
        input$event_type == "death" ~ "Tasa de mortalidad por estado de vacunación",
@@ -269,16 +269,16 @@ server <- function(input, output, session) {
        input$event_type == "cases" ~ "Casos por 100,000 por día por estado de vacunación")
      
      if(!input$event_agerange %in% c("all", "facet")){
-       daily_counts <- filter(daily_counts, ageRange == input$event_agerange)
+       counts <- filter(counts, ageRange == input$event_agerange)
        the_title <- paste(the_title, "para el grupo de edad", input$event_agerange, "años")
      }
      
-     if(input$event_agerange == "all") daily_counts$ageRange <- "all" 
+     if(input$event_agerange == "all") counts$ageRange <- "all" 
      
      the_k <- case_when(input$event_type == "death" ~ 30,
                         input$event_type == "hosp" ~ 30,
                         input$event_type == "cases" ~ 14)
-     tmp <- daily_counts %>% 
+     tmp <- counts %>% 
        filter(status != "Vacunación parcial") %>%
        group_by(date, status, manu, ageRange) %>%
        summarize(obs = sum(obs), n=sum(poblacion, na.rm=TRUE), .groups = "drop") %>%
@@ -322,27 +322,8 @@ server <- function(input, output, session) {
   output$muertes_tabla <- DT::renderDataTable({
     load(file.path(rda_path, "dat_cases_vax.rda"))
     
-    dat_cases_vax <- dat_cases_vax %>%
-      mutate(date = if_else(is.na(date) & !is.na(date_death), date_death, date)) %>%
-      filter(date>= first_day & date <= last_day) %>%
-      mutate(status = case_when(
-        date >= booster_date ~"BST",
-        date >= vax_date ~ "VAX",
-        date >= date_1 ~"PAR",
-        TRUE ~ "UNV")) %>%
-      mutate(manu = factor(ifelse(status == "UNV", "UNV", as.character(manu_1)), levels= c("UNV", "MOD", "PFR", "JSN"))) 
-    
-    dat_cases_vax$status <- factor(dat_cases_vax$status, levels = c("UNV", "PAR", "VAX", "BST"))
-    
-    dat_cases_vax$ageRange_2 <- fct_collapse(dat_cases_vax$ageRange, 
-                                          "12-17" = c("12-15", "16-17"),
-                                         "18-44" = c("18-24", "25-29", "30-34", "35-39", "40-44"),
-                                         "45-64" = c("45-49", "50-54", "55-59","60-64"),
-                                         "65+" = c("65-69", "70-74", "75-79","80-84", "85+"))
-    date_name <-  paste0("date_", input$event_type)
-    
     if(!input$event_agerange %in% c("all", "facet")){
-      dat_cases_vax <- filter(dat_cases_vax, ageRange_2 == input$event_agerange)
+      dat_cases_vax <- filter(dat_cases_vax, ageRange == input$event_agerange)
     } 
     
     dat_cases_vax$cases <- TRUE
@@ -363,7 +344,7 @@ server <- function(input, output, session) {
                                       (status=="VAX" & manu %in% c("PFR","MOD") & days <= 150) | 
                                       (status=="VAX" & manu == "JSN" & days <= 60) ~ " (al día)",
                                     TRUE ~ " (no al día)")) %>%
-      select(date, ageRange, gender, status, manu, days, booster, booster_days, vax_al_dia) %>%
+      select(date, original_ageRange, gender, status, manu, days, booster, booster_days, vax_al_dia) %>%
       mutate(status = as.character(recode(status, UNV = "No vacunado", PAR= "Parcial", VAX="Vacunado", BST = "Vacunado"))) %>%
       mutate(gender = replace_na(gender, "O")) %>%
       mutate(status = case_when(gender == "F" & status == "Vacunado" ~ "Vacunada",
@@ -547,9 +528,9 @@ server <- function(input, output, session) {
       kableExtra::kable_styling()
   })
   output$tabla <- DT::renderDataTable({
-    load(file.path(rda_path, "daily_counts.rda"))
+    load(file.path(rda_path, "dashboard_counts.rda"))
     
-    ret <- daily_counts %>% 
+    ret <- counts %>% 
       filter(date >= input$tabla_range[1] & date <= input$tabla_range[2]) %>%
       pivot_wider(names_from = outcome, values_from = obs) %>%
       mutate(poblacion = make_pretty(round(poblacion))) %>%
