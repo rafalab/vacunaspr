@@ -10,7 +10,7 @@ load(file.path(rda_path, "dat_cases_vax_SYA.rda"))
 dat_cases_vax[is.na(date) & !is.na(date_death), date := date_death]
 
 ## change ageRange from 12-17 that were vaccinated as 5-11 year olds
-dat_cases_vax[ageRange >= 12 & ageRange_1 <12, ageRange := ageRange_1]
+dat_cases_vax[ageRange >= 12 & ageRange <= 17 & ageRange_1 <12, ageRange := ageRange_1]
   
 ## collapse ages
 counts_collapse_func <- function(x)
@@ -22,6 +22,7 @@ dat_vax[, (cols) := lapply(.SD, counts_collapse_func), .SDcols = cols]
 cols <- str_subset(names(dat_cases_vax), "ageRange")
 dat_cases_vax$original_ageRange <- collapse_func(dat_cases_vax$ageRange)
 dat_cases_vax[, (cols) := lapply(.SD, counts_collapse_func), .SDcols = cols]
+
 
 ## remove correctional cases to avoid bias introduced by outbreak
 dat_vax <- dat_vax[(is.na(proveedor_1) | proveedor_1!="Correccional") &
@@ -83,9 +84,9 @@ pop_vax <- dat_vax[!is.na(vax_date) & vax_date <= last_day &
 setnames(pop_vax, c("vax_date", "manu", "ageRange", "gender", "date", "poblacion"))
 setcolorder(pop_vax, c("date", "vax_date", "manu", "ageRange", "gender", "poblacion"))
 pop_vax$manu <- factor(pop_vax$manu, levels = manu_levels)
-pop_vax$ageRange <- factor(pop_vax$ageRange, levels = age_levels)
+pop_vax$ageRange <- factor(pop_vax$ageRange, levels = counts_age_levels)
 pop_vax <- pop_vax[order(manu, ageRange, gender, date, vax_date)]
-#pop_vax %>% group_by(date,ageRange, manu) %>% summarize(n=sum(poblacion)) %>% ggplot(aes(date,n,color=manu))+geom_line()+facet_wrap(~ageRange)
+pop_vax %>% group_by(date,ageRange, manu) %>% summarize(n=sum(poblacion)) %>% ggplot(aes(date,n,color=manu))+geom_line()+facet_wrap(~ageRange)
 
 
 message("Computing populations for vax date/date combinations for partial vax.")
@@ -99,7 +100,7 @@ pop_par <- dat_vax[!is.na(date_1) & date_1 <= last_day &
 setnames(pop_par, c("vax_date", "manu", "ageRange", "gender", "date", "poblacion"))
 setcolorder(pop_par, c("date", "vax_date", "manu", "ageRange", "gender", "poblacion"))
 pop_par$manu <- factor(pop_par$manu, levels = manu_levels)
-pop_par$ageRange <- factor(pop_par$ageRange, levels = age_levels)
+pop_par$ageRange <- factor(pop_par$ageRange, levels = counts_age_levels)
 pop_par <- pop_par[order(manu, ageRange, gender, date, vax_date)]
 #pop_par %>% group_by(date,ageRange, manu) %>% summarize(n=sum(poblacion)) %>% ggplot(aes(date,n,color=manu))+geom_line()+facet_wrap(~ageRange)
 
@@ -122,6 +123,7 @@ names(daily_counts_onedose_age_gender_manu) <- c("date", "ageRange_1", "gender",
 daily_counts_onedose_age_gender_manu <- merge(all_combs, 
                                               daily_counts_onedose_age_gender_manu, 
                                               all.x=TRUE)
+
 daily_counts_onedose_age_gender_manu[is.na(daily_counts_onedose_age_gender_manu)] <- 0 
 counts_onedose_age_gender_manu <- copy(daily_counts_onedose_age_gender_manu)
 counts_onedose_age_gender_manu[, onedose := cumsum(onedose), keyby = .(ageRange_1, gender, manu)]
