@@ -543,7 +543,7 @@ message("Wrangling cases.")
 
 counts_age_starts <- c(0, 5, 12, 18, 40, 60)
 
-source("counpute-counts.R")
+source("compute-counts.R")
 
 save(dat_cases_vax, file = file.path(rda_path, "dat_cases_vax.rda"))
 
