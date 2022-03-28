@@ -22,7 +22,7 @@ cols <- str_subset(names(dat_vax), "ageRange")
 dat_vax[, (cols) := lapply(.SD, counts_collapse_func), .SDcols = cols]
 
 cols <- str_subset(names(dat_cases_vax), "ageRange")
-dat_cases_vax$original_ageRange <- collapse_func(dat_cases_vax$ageRange)
+dat_cases_vax$original_ageRange <- counts_collapse_func(dat_cases_vax$ageRange)
 dat_cases_vax[, (cols) := lapply(.SD, counts_collapse_func), .SDcols = cols]
 
 

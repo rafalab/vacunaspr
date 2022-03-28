@@ -57,6 +57,10 @@ split_10_14 <- function(tab){
 
 load(file.path(rda_path, "population-tabs-acs.rda"))
 muni_levels <- c(levels(raw_pop_municipio$municipio), "No reportado")
+manu_levels <- c("UNV", "MOD", "PFR", "JSN")
+first_ped_day <- make_date(2021, 11, 04)
+first_booster_day <- make_date(2021, 8, 13) 
+first_jnj_booster_day <- make_date(2021, 10, 22) 
 
 ## pick a year to use as population estimates
 setnames(raw_pop, paste0("poblacion_", pop_year), "poblacion")
@@ -84,8 +88,8 @@ pr_adult_pop_se <- sqrt(sum(raw_pop[end<=17]$se^2))
 
 
 message("Wrangling cases.")
-
-source("counpute-counts.R")
+counts_age_starts <- age_starts
+source("compute-counts.R")
 
 save(dat_cases_vax, file = file.path(rda_path, "dat_cases_vax.rda"))
 
