@@ -590,41 +590,55 @@ outcome_tab_totals <- tmp %>%
 ## compute rates only on M and F as we don't have unvax populations for others
 outcome_tab_rates <- tmp %>%
   filter(gender != "O") %>%
-  group_by(date,outcome, ageRange, status, manu) %>%
-  summarize(poblacion = sum(poblacion), obs=sum(obs), .groups = "drop")  %>%
+  group_by(date, outcome, ageRange, status, manu) %>% ##combine gender
+  summarize(poblacion = sum(poblacion), obs=sum(obs), se_poblacion = sqrt(sum(se_poblacion^2)), .groups = "drop") %>% 
   group_by(outcome, ageRange, status, manu) %>%
-  summarize(n = mean(poblacion), 
-            rate = sum(obs),
+  summarize(denom = mean(poblacion), 
+            se_poblacion = mean(se_poblacion), ##should be constant
+            num = sum(obs),
             .groups = "drop") %>%
-  mutate(rate = rate/7/n) 
+  mutate(rate = num / 7 / denom, 
+         conf.low = qpois(0.025, num) / 7 / pmax(denom + qnorm(0.975) * se_poblacion, 0),
+         conf.high = qpois(0.975, num)/ 7 / pmax(denom + qnorm(0.025) * se_poblacion, 0)) %>% 
+  select(-num)
 
 outcome_tab_details <- left_join(outcome_tab_totals, outcome_tab_rates, 
                                  by = c("outcome", "ageRange", "status", "manu")) %>%
+  pivot_longer(c("obs", "rate", "conf.low", "conf.high")) %>%
   arrange(desc(ageRange)) %>%
   filter(!(status == "BST" & manu == "JSN")) %>%
-  pivot_wider(names_from = outcome, values_from = c("obs","rate"))
+  pivot_wider(names_from = c("outcome", "name")) %>%
+  rename(n=denom, se_n = se_poblacion)
+
 
 tmp <- filter(tmp, status != "Vacunación parcial") 
 
 outcome_tab_totals <- tmp %>%
   group_by(outcome, ageRange, status) %>%
-  summarize(obs = sum(obs), .groups = "drop") 
-
+  summarize(obs = sum(obs),
+            .groups = "drop") 
 ## compute rates only on M and F as we don't have unvax populations for others
 outcome_tab_rates <- tmp %>%
-  filter(gender != "O") %>%
-  group_by(outcome, date, ageRange, status) %>%
-  summarize(n = sum(poblacion), obs= sum(obs), .groups = "drop")  %>%
+  filter(gender != "O") %>% 
+  group_by(date, outcome, ageRange, status) %>% ##combine gender
+  summarize(poblacion = sum(poblacion), obs=sum(obs), se_poblacion = sqrt(sum(se_poblacion^2)), .groups = "drop") %>% 
   group_by(outcome, ageRange, status) %>%
-  summarize(n = mean(n), 
-            rate=sum(obs),
+  summarize(denom = mean(poblacion), 
+            se_poblacion = mean(se_poblacion), ##should be constant
+            num = sum(obs),
             .groups = "drop") %>%
-  mutate(rate = rate/7/n)  
+  mutate(rate = num / 7 / denom, 
+         conf.low = qpois(0.025, num) / 7 / pmax(denom + qnorm(0.975) * se_poblacion, 0),
+         conf.high = qpois(0.975, num)/ 7 / pmax(denom + qnorm(0.025) * se_poblacion, 0)) %>% 
+  select(-num)
+
 
 outcome_tab <- left_join(outcome_tab_totals, outcome_tab_rates, 
-                                 by = c("outcome", "ageRange", "status")) %>%
+                         by = c("outcome", "ageRange", "status")) %>%
+  pivot_longer(c("obs", "rate", "conf.low", "conf.high")) %>%
   arrange(desc(ageRange)) %>%
-  pivot_wider(names_from = outcome, values_from = c("obs","rate"))
+  pivot_wider(names_from = c("outcome", "name")) %>%
+  rename(n=denom, se_n = se_poblacion)
 
 # totals <- poblacion %>% 
 #   filter(date == last_day) %>%

@@ -305,6 +305,14 @@ simplify_proveedor <- function(x, col_name = "proveedor") {
                                      TRUE ~ "Otros")) }
   
 make_outcome_tab <- function(tab,  details = FALSE){
+  make_ci <- function(x, l, u, digits = 2){
+    x <- x*10^5; l <- l*10^5; u <- u*10^5
+    ifelse(x < 10^(-digits),
+           paste("<",10^(-digits)),
+           paste0(prettyNum(round(x, digits = digits), nsmall = digits, big.mark = ","), " (",
+                  prettyNum(round(l, digits = digits), nsmall = digits, big.mark = ","), ", ",
+                  prettyNum(round(u, digits = digits), nsmall = digits, big.mark = ","), ")"))
+  }
   if(details){
     tab <- tab %>% 
       mutate(status = recode(status, UNV = "No vacunados", 
@@ -314,16 +322,17 @@ make_outcome_tab <- function(tab,  details = FALSE){
       mutate(manu = recode(as.character(manu), UNV = "", MOD = "Moderna", 
                            PFR = "Pfizer", JSN = "J & J")) %>%
       mutate(n = make_pretty(round(n)),
-             cases = make_pretty(obs_cases), 
-             cases_rate =  digits(rate_cases * 10^5, 0),
-             hosp = make_pretty(obs_hosp), 
-             hosp_rate =  digits(rate_hosp * 10^5, 1),
-             death = make_pretty(obs_death), 
-             death_rate =  digits(rate_death * 10^5, 2)) %>%
+             cases = make_pretty(cases_obs), 
+             cases_rate = make_ci(cases_rate, cases_conf.low, cases_conf.high, 0),
+             hosp = make_pretty(hosp_obs), 
+             hosp_rate =  make_ci(hosp_rate, hosp_conf.low, hosp_conf.high, 1),
+             death = make_pretty(death_obs), 
+             death_rate =  make_ci(death_rate, death_conf.low, death_conf.high, 2)) %>%
+      mutate(n = ifelse(status == "No vacunados", paste(n, "±", make_pretty(round(qnorm(0.975)*se_n))), n)) %>%
       select(ageRange, status, manu, n, death, death_rate,  hosp, hosp_rate, cases, cases_rate)
     
-      kableExtra::kbl(tab, col.names = c("Grupo de edada", "Vacunación", "Tipo de vacuna", "Número de personas", "Muertes", "Muertes por 100K por día",  "Hosp", "Hosp por 100K por día", "Casos", "Casos por 100K por día"),
-                      align = c("c", "c", "c", "c", rep(c("c","l"), 3)))  %>%
+    kableExtra::kbl(tab, col.names = c("Grupo de edada", "Vacunación", "Tipo de vacuna", "Número de personas", "Muertes", "Muertes por 100K por día",  "Hosp", "Hosp por 100K por día", "Casos", "Casos por 100K por día"),
+                    align = c("c", "c", "c", "c", rep(c("c","l"), 3)))  %>%
       kableExtra::kable_styling() %>%
       kableExtra::column_spec(1, width = "12em") %>%
       kableExtra::row_spec(which(tab$status=="No vacunados"), bold = FALSE, color = "black", background = status_colors[["UNV"]]) %>%
@@ -339,12 +348,13 @@ make_outcome_tab <- function(tab,  details = FALSE){
                              VAX="Vacunados sin booster", 
                              BST = "Vacunados con booster")) %>%
       mutate(n = make_pretty(round(n)),
-             cases = make_pretty(obs_cases), 
-             cases_rate =  digits(rate_cases * 10^5, 0),
-             hosp = make_pretty(obs_hosp), 
-             hosp_rate =  digits(rate_hosp * 10^5, 1),
-             death = make_pretty(obs_death), 
-             death_rate =  digits(rate_death * 10^5, 2)) %>%
+             cases = make_pretty(cases_obs), 
+             cases_rate = make_ci(cases_rate, cases_conf.low, cases_conf.high, 0),
+             hosp = make_pretty(hosp_obs), 
+             hosp_rate =  make_ci(hosp_rate, hosp_conf.low, hosp_conf.high, 1),
+             death = make_pretty(death_obs), 
+             death_rate =  make_ci(death_rate, death_conf.low, death_conf.high, 2)) %>%
+      mutate(n = ifelse(status == "No vacunados", paste(n, "±", make_pretty(round(qnorm(0.975)*se_n))), n)) %>%
       select(ageRange, status, n,  death, death_rate, hosp, hosp_rate, cases, cases_rate)
     
     kableExtra::kbl(tab,col.names = c("Group de Edad", "Vacunación", "Número de personas",  "Muertes","Muertes por 100K por día",  "Hosp", "Hosp por 100K por día", "Casos", "Casos por 100K por día"),

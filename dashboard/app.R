@@ -29,15 +29,15 @@ ui <- fluidPage(
                        p("Los datos presentados en este dashboard han sido revisados. Por favor visite la ventana de FAQ para más detalles."),
                        htmlOutput("summary_1"),
                        h4("Resumen de casos, hospitalizaciones y muertes"),
-                       p("Los tamaños de los grupos son diferentes por lo cual no es informativo comparar totales sino las tasas (por 100K por día). Los totales no incluyen personas que han dado positivo a una prueba diagnóstica en los últimos 90 días. También tome en cuenta que los datos de vacunas tienen mayor rezago que los de la pruebas."),
+                       p("Los tamaños de los grupos son diferentes por lo cual no es informativo comparar totales sino las tasas (por 100K por día). Los totales no incluyen personas que han dado positivo a una prueba diagnóstica en los últimos 90 días. También tome en cuenta que los datos de vacunas tienen mayor rezago que los de la pruebas. Los números en paréntisis representan interavlos de confianza que toman en cuenta la variabilidad natural y la incertidumbre en el tamaño de las poblaciones."),
                        radioButtons("summary_type",
                                     label = "",
                                     choices = list("Sencillo" = "simple",
                                                    "Detallado" = "detail"),
                                     selected = "simple",
                                     inline = TRUE),
-                       htmlOutput("titulo_3"),
-                       htmlOutput("summary_3"),
+                      # htmlOutput("titulo_3"),
+                      # htmlOutput("summary_3"),
                        htmlOutput("titulo_2"),
                        htmlOutput("summary_2")
               ),
@@ -204,19 +204,19 @@ ui <- fluidPage(
 server <- function(input, output, session) {
     
   output$fecha <- renderText({
-    load(file.path(rda_path, "dashboard-dates.rda"))
+    load(file.path(rda_path, "dates.rda"))
     paste0("<h4>Datos para ", 
            format(last_day, "%B %d, %Y:"), "</h4>")})
   
   
   output$titulo_2 <- renderText({
-    load(file.path(rda_path, "dashboard-dates.rda"))
+    load(file.path(rda_path, "dates.rda"))
     paste("<p>4 semanas acabando", 
           format(last_day_counts-days(14), "%B %d, %Y:"), "</p>")
     })
 
   # output$titulo_3 <- renderText({
-  #   load(file.path(rda_path, "dashboard-dates.rda"))
+  #   load(file.path(rda_path, "dates.rda"))
   #   paste("<p>Semana acabando", 
   #         format(last_day_counts-weeks(1), "%B %d, %Y"), " (datos parciales):</p>")})
   
@@ -256,9 +256,9 @@ server <- function(input, output, session) {
   #   }
   # })
   
-  
+  #input <- list(event_type = "cases", event_agerange = "facet", event_range = c(first_day, last_day_counts))
    output$muertes_plot <- renderPlot({
-     load(file.path(rda_path, "dashboard_counts.rda"))
+     load(file.path(rda_path, "dashboard-counts.rda"))
      load(file.path(rda_path, "dates.rda"))
      
      counts <- counts %>% filter(outcome==input$event_type)
@@ -280,17 +280,21 @@ server <- function(input, output, session) {
                         input$event_type == "cases" ~ 14)
      tmp <- counts %>% 
        filter(status != "Vacunación parcial") %>%
-       group_by(date, status, manu, ageRange) %>%
-       summarize(obs = sum(obs), n=sum(poblacion, na.rm=TRUE), .groups = "drop") %>%
+       group_by(date, status, manu, ageRange) %>% #combine gender
+       summarize(obs = sum(obs), n=sum(poblacion, na.rm=TRUE), se_poblacion = sqrt(sum(se_poblacion^2)), .groups = "drop") %>%
        group_by(status, manu, ageRange) %>% 
-       mutate(denom =  ma7(date, n, k = the_k)$moving_avg) %>%
-       mutate(rate = ma7(date, obs, k = the_k)$moving_avg/denom * 10^5) %>%
+       mutate(denom =  sum7(date, n, k = the_k)$moving_avg) %>%
+       mutate(num = sum7(date, obs, k = the_k)$moving_avg) %>%
        ungroup() %>%
+       mutate(rate = num/denom * 10^5, 
+              conf.low = qpois(0.025, num) / (denom +  the_k * qnorm(0.975) * se_poblacion) * 10^5,
+              conf.high = qpois(0.975, num)/ (denom +  the_k * qnorm(0.025) * se_poblacion) * 10^5) %>%
        filter(date >= input$event_range[1] & date <= input$event_range[2]) %>%
-       filter(denom > 1000) %>%
+       filter(denom > 10000 * 7 ) %>%
        mutate(Vacunación = ifelse(status=="Vacunación no al día", "no al día", "al día"))
      
-       p <- tmp %>% ggplot(aes(date, rate, color = manu, lty = Vacunación)) +
+       p <- tmp %>% ggplot(aes(date, rate,  color = manu, lty = Vacunación)) +
+         geom_ribbon(mapping = aes(ymin = conf.low, ymax = conf.high), data = filter(tmp, manu=="UNV"), fill = scales::hue_pal()(4)[1], color = NA, alpha = 0.5, show.legend=FALSE) +
          geom_line(lwd = 1.25, alpha = 0.7) +
          labs(y="Tasa por día por 100,000", x="Fecha", title = the_title, 
               caption = paste("Basado en media móvil de", the_k,"días.\nArea gris contiene datos incompletos.")) +
