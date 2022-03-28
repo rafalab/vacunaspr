@@ -7,6 +7,8 @@ counts_age_levels <- levels(counts_pop_by_age_gender$ageRange)
 load(file.path(rda_path, "dat_vax_SYA.rda"))
 
 load(file.path(rda_path, "dat_cases_vax_SYA.rda"))
+load(file.path(rda_path, "dates.rda"))
+all_dates <- data.table(date = seq(first_day, last_day, "days"))
 dat_cases_vax[is.na(date) & !is.na(date_death), date := date_death]
 
 ## change ageRange from 12-17 that were vaccinated as 5-11 year olds
@@ -42,6 +44,7 @@ dat_cases_vax[date < date_1, manu := "UNV"]
 dat_cases_vax$status <- factor(dat_cases_vax$status, levels = c("UNV", "PAR", "VAX", "BST"))
 
 ## Compute number of unvaccinated that were susceptible
+all_dates <- data.table(date = seq(first_day, last_day, "days"))
 all_combs <- with(dat_cases_vax[!is.na(ageRange)],
                   CJ(date = seq(min(all_dates$date)-2-days(90), max(all_dates$date), by="day"),
                      ageRange = unique(ageRange),
