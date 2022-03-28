@@ -176,7 +176,7 @@ vax <- merge(pop_vax, vax, by = c("manu", "ageRange", "gender", "date", "vax_dat
 vax[is.na(vax)] <- 0
 vax <- melt(vax, measure.vars = c("cases", "hosp", "death"),
             variable.name = "outcome", value.name = "obs")
-vax[,`:=`(primary_manu = NA, status = "VAX", se_poblacion = NA)]
+vax[,`:=`(primary_manu = NA, status = "VAX", se_poblacion = 0)]
 
 message("Computing daily counts.")
 
@@ -186,7 +186,7 @@ par <- par[, .(cases = .N, hosp = sum(hosp), death = sum(death)), keyby = .(manu
 par <- merge(pop_par, par, by = c("manu", "ageRange", "gender", "date", "vax_date"), all.x = TRUE) 
 par[is.na(par)] <- 0
 par <- melt(par, measure.vars = c("cases", "hosp", "death"), variable.name = "outcome", value.name = "obs")
-par[,`:=`(primary_manu=NA, status = "PAR", se_poblacion = NA)]
+par[,`:=`(primary_manu=NA, status = "PAR", se_poblacion = 0)]
 
 
 bst <- dat_cases_vax[status == "BST" & gender %in% c("F", "M") & booster_ageRange != "0-4"]
@@ -200,7 +200,7 @@ bst <- bst[!is.na(poblacion),]
 setnames(bst, c("manu_1","booster_manu", "booster_date", "booster_ageRange"), 
          c("primary_manu", "manu", "vax_date", "ageRange"))
 bst <- melt(bst, measure.vars = c("cases", "hosp", "death"), variable.name = "outcome", value.name = "obs")
-bst[, `:=`(status = "BST", se_poblacion = NA)]
+bst[, `:=`(status = "BST", se_poblacion = 0)]
 
 
 unvax <- dat_cases_vax[status == "UNV" & gender %in% c("F", "M")]

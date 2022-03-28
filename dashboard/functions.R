@@ -29,6 +29,9 @@ digits <- function(x, digits = 2){
 ma7 <- function(d, y, k = 7) 
   tibble(date = d, moving_avg = as.numeric(stats::filter(y, rep(1/k, k), side = 1)))
 
+sum7 <- function(d, y, k = 7) 
+  tibble(date = d, moving_avg = as.numeric(stats::filter(y, rep(1, k), side = 1)))
+
 
 make_datatable <- function(tab, col.names = colnames(tab),
                            align = rep("c", ncol(tab)),

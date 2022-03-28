@@ -567,9 +567,11 @@ counts[, status := fcase(
   default = "Vacunación no al día")]
 counts$status <- factor(counts$status, levels=c("No vacunados", "Vacunación parcial", "Vacunación no al día", "Vacunación al día"))
  
+counts[, se_poblacion := se^2]
 counts <- counts[, keyby = .(date, ageRange, gender, outcome, status, manu), 
             lapply(.SD, sum), 
-            .SDcols = c("obs", "poblacion")]
+            .SDcols = c("obs", "poblacion", "se_poblacion")]
+counts[, se_poblacion := sqrt(se_poblacion)]
 
 counts <- counts[order(date)]
 
