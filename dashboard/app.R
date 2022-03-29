@@ -63,7 +63,7 @@ ui <- fluidPage(
                                        choice = c("Agregados" = "all",
                                                   "Todos" = "facet",
                                                   rev(counts_age_levels[-1])),
-                                       selected = "all"),
+                                       selected = "facet"),
                            selectInput("event_scale",
                                        "Escala",choice = c("Lineal" = "linear",
                                                            "Logarítimica" = "log"),
