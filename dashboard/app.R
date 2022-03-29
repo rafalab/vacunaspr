@@ -532,7 +532,7 @@ server <- function(input, output, session) {
       kableExtra::kable_styling()
   })
   output$tabla <- DT::renderDataTable({
-    load(file.path(rda_path, "dashboard_counts.rda"))
+    load(file.path(rda_path, "dashboard-counts.rda"))
     
     ret <- counts %>% 
       filter(date >= input$tabla_range[1] & date <= input$tabla_range[2]) %>%
