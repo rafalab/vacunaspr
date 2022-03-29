@@ -20,7 +20,7 @@ collapse_age <- function(tab, age_starts){
                         labels = labels)]
   ret[, c("start", "end") := NULL]
   
-  vars <- "poblacion"
+  vars <- intersect(names(ret), c("poblacion", "next_year_prediction"))
   
   if("se" %in% names(ret)){ ret[, se := se^2]; vars <- c(vars, "se")}
   
@@ -39,16 +39,17 @@ split_10_14 <- function(tab){
   tmp1 <- tab[!start %in% c(10,12)]
   tmp2 <- tab[start %in% c(10,12)]
   
-  if("se" %in% names(tmp1)){
+  if(all(c("se", "next_year_prediction") %in% names(tmp1))){
     f <- function(tab) data.table(start=c(10,12), end=c(11,14), 
                                   poblacion=tab$poblacion*c(2,3)/5,
+                                  next_year_prediction = tab$next_year_prediction*c(2,3)/5,
                                   se = tab$se*sqrt(c(2,3)/5))
   } else{
     f <- function(tab) data.table(start=c(10,12), end=c(11,14), 
                                   poblacion=tab$poblacion*c(2,3)/5)
   }
     
-  keys <- setdiff(names(tmp2), c("start", "end", "poblacion", "se"))
+  keys <- setdiff(names(tmp2), c("start", "end", "poblacion", "se", "next_year_prediction"))
   tmp2 <- tmp2[, f(.SD), by = keys]
   setcolorder(tmp2, names(tmp1))
   ret <- rbindlist(list(tmp1, tmp2))[order(start, gender)]
@@ -60,6 +61,7 @@ muni_levels <- c(levels(raw_pop_municipio$municipio), "No reportado")
 
 ## pick a year to use as population estimates
 setnames(raw_pop, paste0("poblacion_", pop_year), "poblacion")
+setnames(raw_pop, paste0("poblacion_", pop_year+1), "next_year_prediction")
 out <- str_subset(names(raw_pop), "poblacion_")
 raw_pop[, (out) := NULL]
 setnames(raw_pop_municipio, paste0("poblacion_", pop_year), "poblacion")
