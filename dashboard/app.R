@@ -330,6 +330,8 @@ server <- function(input, output, session) {
       dat_cases_vax <- filter(dat_cases_vax, ageRange == input$event_agerange)
     } 
     
+    date_name <- paste0("date_", input$event_type)
+    
     dat_cases_vax$cases <- TRUE
     dat_cases_vax$date_cases <- dat_cases_vax$date
     ret <- dat_cases_vax %>% 
