@@ -282,8 +282,10 @@ server <- function(input, output, session) {
        filter(status != "Vacunación parcial") %>%
        group_by(date, status, manu, ageRange) %>% #combine gender
        summarize(obs = sum(obs), n=sum(poblacion, na.rm=TRUE), se_poblacion = sqrt(sum(se_poblacion^2)), .groups = "drop") %>%
-       group_by(status, manu, ageRange) %>% 
-       mutate(denom =  sum7(date, n, k = the_k)$moving_avg) %>%
+       group_by(status, manu, ageRange) %>%
+       mutate(no_dates = length(date))%>% 
+       filter(no_dates >= the_k ) %>%
+       mutate(denom = sum7(date, n, k = the_k)$moving_avg) %>%
        mutate(num = sum7(date, obs, k = the_k)$moving_avg) %>%
        ungroup() %>%
        mutate(rate = num/denom * 10^5, 
